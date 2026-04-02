@@ -1,6 +1,0 @@
-ani-cli
-google-chrome
-helium-browser-bin
-nekoray-bin
-throne-bin
-where-is-my-sddm-theme-git
