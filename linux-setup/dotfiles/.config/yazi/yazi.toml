@@ -1,0 +1,5 @@
+[mgr]
+show_hidden = true
+
+[preview]
+image_protocol = "kitty"

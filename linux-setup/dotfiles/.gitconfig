@@ -1,0 +1,7 @@
+[user]
+	name = CHANGEME
+	email = CHANGEME@example.com
+[credential]
+	helper = libsecret
+[init]
+	defaultBranch = master

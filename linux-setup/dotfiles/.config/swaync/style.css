@@ -1,0 +1,148 @@
+/* Hide floating notification popups — everything goes to the control center */
+notificationwindow {
+  opacity: 0;
+}
+
+/* ── Control Center ──────────────────────────────────────────────── */
+.control-center {
+  background: rgba(16, 16, 16, 0.95);
+  border: 1px solid rgba(186, 187, 241, 0.15);
+  border-radius: 10px;
+  padding: 8px;
+  color: #c6d0f5;
+}
+
+.control-center-list {
+  background: transparent;
+}
+
+/* Title row */
+.widget-title {
+  background: transparent;
+  color: #c6d0f5;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 4px 8px 8px 8px;
+}
+
+.widget-title > button {
+  background: rgba(186, 187, 241, 0.1);
+  color: #babbf1;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.widget-title > button:hover {
+  background: rgba(186, 187, 241, 0.2);
+}
+
+/* DND toggle */
+.widget-dnd {
+  background: transparent;
+  padding: 0px 8px 8px 8px;
+  color: #c6d0f5;
+  font-size: 13px;
+}
+
+.widget-dnd > switch {
+  background: rgba(186, 187, 241, 0.15);
+  border: none;
+  border-radius: 12px;
+}
+
+.widget-dnd > switch:checked {
+  background: #babbf1;
+}
+
+.widget-dnd > switch slider {
+  background: #c6d0f5;
+  border-radius: 12px;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+/* Empty state */
+.notifications-group-not-found {
+  color: #626880;
+  font-size: 13px;
+}
+
+/* Notification card */
+.notification-row {
+  background: none;
+  outline: none;
+  padding: 3px 0;
+}
+
+.notification-background {
+  background: rgba(30, 30, 46, 0.9);
+  border: 1px solid rgba(186, 187, 241, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.notification-background:hover {
+  background: rgba(40, 40, 60, 0.95);
+}
+
+/* App icon */
+.notification .app-icon {
+  -gtk-icon-size: 32px;
+}
+
+/* Summary (title) */
+.notification .summary {
+  color: #c6d0f5;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* Body */
+.notification .body {
+  color: #a5adce;
+  font-size: 12px;
+}
+
+/* App name */
+.notification .app-name {
+  color: #626880;
+  font-size: 11px;
+}
+
+/* Timestamp */
+.notification .time {
+  color: #626880;
+  font-size: 11px;
+}
+
+/* Close button */
+.close-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a5adce;
+  border: none;
+  border-radius: 100%;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #c6d0f5;
+}
+
+/* Group collapse button */
+.notification-group-buttons > button {
+  background: rgba(186, 187, 241, 0.08);
+  color: #babbf1;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.notification-group-buttons > button:hover {
+  background: rgba(186, 187, 241, 0.18);
+}

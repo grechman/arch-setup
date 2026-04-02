@@ -1,0 +1,102 @@
+{
+    "position": "top",
+    "modules-left": ["hyprland/workspaces"],
+    "modules-center": ["custom/swaync", "clock"],
+    "modules-right": ["hyprland/language", "pulseaudio", "network", "cpu", "memory", "battery", "tray", "custom/lock"],
+
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "on-click": "activate",
+        "persistent-workspaces": {
+            "*": 5
+        },
+        "format-icons": {
+            "1": "\uE7C5",
+            "2": "󰖟",
+            "3": "\uEE01",
+            "4": "󱘖",
+            "5": "󰆍",
+            "6": "󰲪",
+            "7": "󰲬",
+            "8": "󰲮",
+            "9": "󰲰",
+            "10": "󰿩"
+        }
+    },
+
+    "clock": {
+        "timezone": "Europe/Moscow",
+        "format": "{:%d - %H:%M}",
+        "format-alt": "{:%Y-%m-%d}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "cpu": {
+        "interval": 1,
+        "format": " {usage}% {icon}",
+        "format-icons": ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+    },
+
+    "memory": {
+        "interval": 1,
+        "format": " {used:0.1f}G/{total:0.1f}G"
+    },
+
+    "network": {
+        "interval": 5,
+        "format-wifi": " {essid}",
+        "format-ethernet": " {ipaddr}",
+        "format-disconnected": "⚠ Disconnected",
+        "tooltip-format": "{ifname}: {ipaddr}"
+    },
+
+    "hyprland/language": {
+        "format": "{short}"
+    },
+
+    "pulseaudio": {
+        "format": " {volume}%",
+        "format-muted": " muted",
+        "on-click": "pavucontrol"
+    },
+
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    },
+
+    "battery": {
+        "interval": 30,
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    },
+
+    "custom/lock": {
+        "format": "󰌾",
+        "on-click": "sleep 0.5 && hyprlock"
+    },
+
+    "custom/swaync": {
+        "tooltip": false,
+        "format": "<span font-size='small' rise='3500'>{}</span>{icon}",
+        "format-icons": {
+            "notification": "󰂚",
+            "none": "󰂜",
+            "new": "󰂚",
+            "dnd-notification": "󱅫",
+            "dnd-none": "󱅫",
+            "dnd-new": "󱅫"
+        },
+        "return-type": "json",
+        "exec-if": "which swaync-client",
+        "exec": "~/.config/waybar/swaync-status.sh",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "swaync-client -d -sw",
+        "escape": true
+    }
+}
