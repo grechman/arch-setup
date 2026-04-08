@@ -8,7 +8,7 @@
 }
 
 #waybar {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.4);
   color: #c6d0f5;
   margin: 2px 2px;
 }
@@ -16,11 +16,12 @@
 #workspaces {
   border-radius: 5px;
   margin: 5px;
-  background: #101010;
+  background: transparent;
   margin-left: 1rem;
 }
 
 #workspaces button {
+  background: transparent;
   color: #babbf1;
   border-radius: 5px;
   padding: 0.4rem;
@@ -29,10 +30,12 @@
 #workspaces button.active {
   color: #99d1db;
   border-radius: 5px;
+  background: transparent;
 }
 
 #workspaces button:hover {
   color: #85c1dc;
+  background: transparent;
   border-radius: 5px;
 }
 
@@ -45,6 +48,7 @@
 #battery,
 #custom-lock {
   background-color: #101010;
+  background: transparent;
   padding: 0.5rem 1rem;
   margin: 5px 0px;
   border-radius: 0px;
@@ -90,15 +94,30 @@
 #custom-lock {
   margin-right: 1rem;
   color: #babbf1;
+  background: transparent;
 }
 
 #clock {
   color: #8caaee;
-  background-color: #101010;
+  background: transparent;
   padding: 0.5rem 1rem;
   margin: 5px 0px;
   margin-right: 1rem;
   border-radius: 0px;
+}
+
+#custom-notif-text {
+  background: transparent;
+  color: #f2d5cf;
+  font-size: 16px;
+  padding: 0.5rem 1rem;
+  margin: 5px 0px;
+  margin-left: 1rem;
+}
+
+#custom-notif-text.empty {
+  padding: 0;
+  margin: 0;
 }
 
 @keyframes notify-pop {
@@ -110,6 +129,7 @@
 
 #custom-swaync {
   background-color: #101010;
+  background: transparent;
   color: #babbf1;
   padding: 0.5rem 1rem;
   margin: 5px 0px;

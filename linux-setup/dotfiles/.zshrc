@@ -105,6 +105,8 @@ source $ZSH/oh-my-zsh.sh
 export PATH="$HOME/.local/bin:$PATH"
 export EDITOR=nvim
 export PATH=$PATH:$HOME/go/bin
+alias airpods='bluetoothctl connect CHANGEME'
+alias airpods-off='bluetoothctl disconnect CHANGEME'
 alias vim='nvim'
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 export PATH=~/.npm-global/bin:$PATH

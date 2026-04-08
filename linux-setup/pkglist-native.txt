@@ -194,6 +194,7 @@ sg3_utils
 smartmontools
 sof-firmware
 spectacle
+speech-dispatcher
 sudo
 swaybg
 swaync
