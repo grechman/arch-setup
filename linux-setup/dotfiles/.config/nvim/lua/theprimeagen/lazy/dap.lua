@@ -138,6 +138,54 @@ return {
                     dapui.eval(body.output) -- Sends stdout/stderr to Console
                 end
             end
+
+            local function transparent_dapui()
+                local function strip_bg(g)
+                    local hl = vim.api.nvim_get_hl(0, { name = g, link = false }) or {}
+                    hl.bg = nil
+                    hl.ctermbg = nil
+                    vim.api.nvim_set_hl(0, g, hl)
+                end
+                for _, g in ipairs({ "DapUIFloatNormal", "NormalFloat", "NormalNC" }) do
+                    strip_bg(g)
+                end
+                vim.api.nvim_set_hl(0, "DapUIFloatBorder", { fg = "#403d52", bg = "NONE" })
+            end
+
+            local function force_win_transparent(win)
+                if not win or win == -1 or not vim.api.nvim_win_is_valid(win) then return end
+                vim.api.nvim_set_option_value(
+                    "winhighlight",
+                    "Normal:Normal,NormalNC:Normal,NormalFloat:Normal,FloatBorder:DapUIFloatBorder,EndOfBuffer:Normal",
+                    { win = win }
+                )
+            end
+
+            local dap_group = vim.api.nvim_create_augroup("DapUITransparent", { clear = true })
+
+            transparent_dapui()
+
+            vim.api.nvim_create_autocmd("ColorScheme", {
+                group = dap_group,
+                callback = transparent_dapui,
+            })
+
+            vim.api.nvim_create_autocmd("WinNew", {
+                group = dap_group,
+                callback = function()
+                    vim.schedule(function()
+                        local win = vim.api.nvim_get_current_win()
+                        if not vim.api.nvim_win_is_valid(win) then return end
+                        local cfg = vim.api.nvim_win_get_config(win)
+                        if cfg.relative == "" then return end
+                        local wh = vim.api.nvim_get_option_value("winhighlight", { win = win })
+                        if wh:match("DapUIFloat") then
+                            transparent_dapui()
+                            force_win_transparent(win)
+                        end
+                    end)
+                end,
+            })
         end,
     },
 
