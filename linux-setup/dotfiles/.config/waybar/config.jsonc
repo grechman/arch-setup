@@ -2,7 +2,7 @@
     "position": "top",
     "modules-left": ["hyprland/workspaces", "custom/notif-text"],
     "modules-center": ["custom/swaync", "clock"],
-    "modules-right": ["hyprland/language", "pulseaudio", "network", "cpu", "memory", "battery", "tray", "custom/lock"],
+    "modules-right": ["hyprland/language", "pulseaudio", "custom/network", "cpu", "memory", "battery", "tray", "custom/lock"],
 
     "hyprland/workspaces": {
         "format": "{icon}",
@@ -42,12 +42,11 @@
         "format": " {used:0.1f}G/{total:0.1f}G"
     },
 
-    "network": {
+    "custom/network": {
+        "exec": "~/.config/waybar/wifi-status.sh",
+        "return-type": "json",
         "interval": 5,
-        "format-wifi": " {essid}",
-        "format-ethernet": " {ipaddr}",
-        "format-disconnected": "⚠ Disconnected",
-        "tooltip-format": "{ifname}: {ipaddr}"
+        "tooltip": true
     },
 
     "hyprland/language": {
