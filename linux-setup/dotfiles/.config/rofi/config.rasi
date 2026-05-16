@@ -1,1 +1,96 @@
-configuration { terminal: "ghostty"; }
+configuration {
+    terminal: "ghostty";
+    show-icons: true;
+    icon-theme: "Papirus-Dark";
+    display-drun: "";
+    drun-display-format: "{name}";
+    disable-history: false;
+    hide-scrollbar: true;
+    font: "JetBrainsMono Nerd Font 12";
+}
+
+@theme "/dev/null"
+@import "colors.rasi"
+
+* {
+    background-color: transparent;
+    text-color: @fg;
+    font: "JetBrainsMono Nerd Font 12";
+}
+
+window {
+    transparency: "real";
+    background-color: @bg;
+    border: 2px;
+    border-color: @border;
+    border-radius: 8px;
+    width: 600px;
+    padding: 12px;
+    location: center;
+    anchor: center;
+}
+
+mainbox {
+    spacing: 10px;
+    children: [ inputbar, listview ];
+}
+
+inputbar {
+    padding: 8px 12px;
+    background-color: @bg-alt;
+    border: 0 0 1px 0;
+    border-color: @border;
+    children: [ prompt, entry ];
+}
+
+prompt {
+    text-color: @accent;
+    padding: 0 8px 0 0;
+}
+
+entry {
+    placeholder: "Search…";
+    placeholder-color: @fg-dim;
+    text-color: @fg;
+    cursor: text;
+}
+
+listview {
+    lines: 10;
+    columns: 1;
+    cycle: true;
+    dynamic: true;
+    scrollbar: false;
+    spacing: 2px;
+    padding: 4px 0 0 0;
+}
+
+element {
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+element normal.normal {
+    text-color: @fg;
+}
+
+element selected.normal {
+    background-color: @bg-sel;
+    text-color: @fg-sel;
+}
+
+element alternate.normal {
+    text-color: @fg;
+}
+
+element-icon {
+    size: 22px;
+    padding: 0 10px 0 0;
+    background-color: transparent;
+}
+
+element-text {
+    text-color: inherit;
+    vertical-align: 0.5;
+}

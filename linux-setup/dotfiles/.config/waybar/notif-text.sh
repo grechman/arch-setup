@@ -5,7 +5,7 @@ exec 2>/dev/null
 NOTIF_FILE="/tmp/waybar-last-notif"
 : > "$NOTIF_FILE"
 
-MAX_CHARS=58
+MAX_CHARS="${WAYBAR_NOTIF_MAX_CHARS:-58}"
 
 # Dbus Notify string order (strings only, skipping uint32/int32):
 # 1: app_name, 2: icon (usually empty), 3: summary, 4: body
@@ -67,7 +67,7 @@ while IFS= read -r line; do
             if [ "$total_len" -gt "$MAX_CHARS" ]; then
                 remaining=$(( MAX_CHARS - ${#prefix_text} ))
                 if [ "$remaining" -gt 3 ]; then
-                    msg="${msg:0:$remaining}..."
+                    msg="${msg:0:$(( remaining - 3 ))}..."
                 else
                     msg="..."
                 fi

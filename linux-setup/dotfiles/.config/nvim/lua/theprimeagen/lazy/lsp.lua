@@ -31,6 +31,8 @@ return {
                 "vtsls",
                 "tailwindcss",
                 "clangd",
+                "pyright",
+                "ruff",
             },
         })
 

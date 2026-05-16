@@ -1,0 +1,62 @@
+@import url("colors.css");
+
+* {
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 12px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
+#waybar {
+  background: alpha(@bg, 0.94);
+  color: @fg_alt;
+  border-bottom: 1px solid alpha(@accent, 0.10);
+}
+
+#workspaces {
+  margin: 0 10px;
+}
+
+#workspaces button {
+  min-height: 27px;
+  min-width: 17px;
+  padding: 0 4px;
+  margin: 0;
+  color: @fg_muted;
+  background: transparent;
+  border-radius: 0;
+}
+
+#workspaces button.active {
+  color: @accent;
+}
+
+#clock {
+  min-height: 27px;
+  padding: 0 10px;
+  color: @fg;
+  font-size: 13px;
+  font-weight: 800;
+  background: transparent;
+}
+
+#pulseaudio,
+#language,
+#network,
+#battery,
+#custom-notif {
+  min-height: 27px;
+  padding: 0 7px;
+  margin: 0;
+  color: @fg_alt;
+  background: transparent;
+}
+
+#battery.warning,
+#battery.critical,
+#pulseaudio,
+#network,
+#language {
+  color: @fg_alt;
+}

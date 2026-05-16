@@ -1,0 +1,165 @@
+@import url("colors.css");
+
+* {
+  font-family: JetbrainsMono Nerd Font;
+  font-size: 20px;
+  min-height: 0;
+  padding-right: 2px;
+  padding-left: 2px;
+  padding-bottom: 0px;
+}
+
+#waybar {
+  background: alpha(@bg, 0.8);
+  color: @fg;
+  margin: 2px 2px;
+}
+
+#workspaces {
+  border-radius: 5px;
+  margin: 5px;
+  background: transparent;
+  margin-left: 1rem;
+}
+
+#workspaces button {
+  background: transparent;
+  color: @fg_alt;
+  border-radius: 5px;
+  padding: 0.4rem;
+}
+
+#workspaces button.active {
+  color: @accent;
+  border-radius: 5px;
+  background: transparent;
+}
+
+#workspaces button:hover {
+  color: @hover;
+  background: transparent;
+  border-radius: 5px;
+}
+
+#tray,
+#language,
+#pulseaudio,
+#network,
+#custom-network,
+#cpu,
+#memory,
+#battery,
+#custom-lock {
+  background: transparent;
+  padding: 0.5rem 1rem;
+  margin: 5px 0px;
+  border-radius: 0px;
+}
+
+#language {
+  color: @info;
+  margin-left: 1rem;
+}
+
+#pulseaudio {
+  color: @critical;
+}
+
+#network,
+#custom-network.good,
+#custom-network.ethernet {
+  color: @ok;
+}
+
+#custom-network.mid {
+  color: @warn;
+}
+
+#custom-network.bad,
+#custom-network.disconnected {
+  color: @critical;
+}
+
+#cpu {
+  color: @cpu_color;
+}
+
+#memory {
+  color: @mem_color;
+}
+
+#battery {
+  color: @ok;
+}
+
+#battery.warning {
+  color: @warn;
+}
+
+#battery.critical {
+  color: @critical;
+}
+
+#tray {
+  margin-left: 1rem;
+}
+
+#custom-lock {
+  margin-right: 1rem;
+  color: @fg_alt;
+  background: transparent;
+}
+
+#clock {
+  color: @info_alt;
+  background: transparent;
+  padding: 0.5rem 1rem;
+  margin: 5px 0px;
+  margin-right: 1rem;
+  border-radius: 0px;
+}
+
+#custom-notif-text {
+  background: transparent;
+  color: @accent;
+  font-size: 16px;
+  padding: 0.5rem 1rem;
+  margin: 5px 0px;
+  margin-left: 1rem;
+}
+
+#custom-notif-text.empty {
+  padding: 0;
+  margin: 0;
+}
+
+@keyframes notify-pop {
+  0%   { font-size: 20px; }
+  40%  { font-size: 27px; }
+  70%  { font-size: 23px; }
+  100% { font-size: 20px; }
+}
+
+#custom-swaync {
+  background: transparent;
+  color: @fg_alt;
+  padding: 0.5rem 1rem;
+  margin: 5px 0px;
+  margin-left: 1rem;
+  border-radius: 0px;
+  transition: color 0.2s ease;
+}
+
+#custom-swaync.notification {
+  color: @accent;
+}
+
+#custom-swaync.new {
+  color: @accent;
+  animation: notify-pop 0.5s ease forwards;
+}
+
+#custom-swaync.dnd-none,
+#custom-swaync.dnd-notification {
+  color: @fg_muted;
+}

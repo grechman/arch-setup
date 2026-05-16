@@ -81,15 +81,19 @@ Some packages might fail if they're specific to your hardware. That's fine, skip
 # Configs
 cp -r linux-setup/dotfiles/.config/* ~/.config/
 cp linux-setup/dotfiles/.zshrc ~/
+cp linux-setup/dotfiles/.zprofile ~/
+cp linux-setup/dotfiles/.tmux.conf ~/
 cp linux-setup/dotfiles/.gitconfig ~/
+cp -r linux-setup/dotfiles/.local/* ~/.local/
 
 # Font
 mkdir -p ~/.local/share/fonts
 cp linux-setup/dotfiles/.local/share/fonts/* ~/.local/share/fonts/
 fc-cache -fv
 
-# Wallpaper (hyprpaper.conf points to this)
-git clone https://github.com/ThePrimeagen/anime.git ~/Pictures/anime
+# Wallpapers
+mkdir -p ~/Pictures
+cp -r linux-setup/Pictures/anime ~/Pictures/
 ```
 
 
@@ -106,6 +110,11 @@ hyprctl monitors
 # Set zsh as default shell
 chsh -s /usr/bin/zsh
 
+# Try the rice helpers
+waybar-set list
+theme list
+reload-tabs
+
 # Log out and back in (or reboot) to start Hyprland
 ```
 
@@ -115,6 +124,10 @@ chsh -s /usr/bin/zsh
 - [ ] GRUB shows both Windows and EndeavourOS
 - [ ] Hyprland starts, wallpaper loads
 - [ ] Waybar visible
+- [ ] `waybar-set focus` switches Waybar layout
+- [ ] `theme kanagawa-dragon` applies Hyprland/app colors
+- [ ] `wallpaper-set ~/Pictures/anime/driving.jpg` updates wallpaper
+- [ ] `reload-tabs` opens the tmux main session
 - [ ] Ghostty opens (check keybind in hyprland.conf)
 - [ ] Rofi launcher works
 - [ ] Notifications (swaync) work

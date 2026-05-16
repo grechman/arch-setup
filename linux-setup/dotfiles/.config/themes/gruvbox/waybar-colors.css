@@ -1,0 +1,15 @@
+/* gruvbox dark hard */
+@define-color bg        #1d2021;
+@define-color bg_alt    #282828;
+@define-color fg        #ebdbb2;
+@define-color fg_muted  #928374;
+@define-color fg_alt    #a89984;
+@define-color accent    #d79921;
+@define-color hover     #d65d0e;
+@define-color ok        #98971a;
+@define-color warn      #d79921;
+@define-color critical  #cc241d;
+@define-color info      #8ec07c;
+@define-color info_alt  #83a598;
+@define-color cpu_color #d65d0e;
+@define-color mem_color #b16286;

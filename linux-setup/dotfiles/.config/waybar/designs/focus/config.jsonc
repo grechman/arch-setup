@@ -1,0 +1,56 @@
+{
+    "position": "top",
+    "height": 27,
+    "modules-left": ["hyprland/workspaces"],
+    "modules-center": ["clock"],
+    "modules-right": ["hyprland/language", "network", "pulseaudio", "battery", "custom/notif"],
+
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "on-click": "activate",
+        "persistent-workspaces": { "*": 5 },
+        "format-icons": {
+            "active": "●",
+            "default": "•"
+        }
+    },
+
+    "clock": {
+        "timezone": "Europe/Moscow",
+        "format": "{:%H:%M}",
+        "format-alt": "{:%A %d %B}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "battery": {
+        "interval": 2,
+        "states": { "warning": 30, "critical": 15 },
+        "format": "bat {capacity}%",
+        "format-charging": "bat +{capacity}%",
+        "format-discharging": "bat {capacity}%",
+        "format-full": "bat {capacity}%"
+    },
+
+    "pulseaudio": {
+        "format": "vol {volume}%",
+        "format-muted": "vol 0%",
+        "on-click": "pavucontrol"
+    },
+
+    "network": {
+        "format-wifi": "{icon}",
+        "format-ethernet": "󰈀",
+        "format-disconnected": "󰤭",
+        "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
+        "tooltip": false
+    },
+
+    "hyprland/language": {
+        "format": "{short}"
+    },
+
+    "custom/notif": {
+        "format": "󰂜",
+        "on-click": "swaync-client -t -sw"
+    }
+}

@@ -58,6 +58,21 @@ autocmd('BufEnter', {
 })
 
 
+autocmd('FileType', {
+    group = ThePrimeagenGroup,
+    pattern = 'qf',
+    callback = function(e)
+        local win = vim.fn.bufwinid(e.buf)
+        if win == -1 then return end
+        vim.api.nvim_set_option_value(
+            'winhighlight',
+            'Normal:Normal,NormalNC:Normal,EndOfBuffer:Normal,QuickFixLine:Normal,Search:None',
+            { win = win }
+        )
+    end,
+})
+
+
 autocmd('LspAttach', {
     group = ThePrimeagenGroup,
     callback = function(e)

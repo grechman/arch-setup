@@ -1,23 +1,13 @@
 font-family = JetBrainsMono Nerd Font
 font-size = 14
 command = /usr/bin/zsh
-background-opacity = 0.9
+background-opacity = 0.91
 background-blur=true
- theme = Gruvbox Dark
-# theme = Catppuccin Mocha
-# theme = Catppuccin Macchiato
-# theme = Catppuccin Frappe
-# theme = TokyoNight
-# theme = TokyoNight Storm
-# theme = TokyoNight Moon
-# theme = Dracula
-# theme = Dracula+
-# theme = Nord
-# theme = Rose Pine
-# theme = Rose Pine Moon
-# theme = Kanagawa Wave
-# theme = Kanagawa Dragon
-# theme = Everforest Dark Hard
-# theme = Nightfox
-# theme = Carbonfox
-# theme = Monokai Pro
+# theme is managed by ~/.local/bin/theme-apply (rose-pine | gruvbox)
+theme = Kanagawa Dragon
+
+# Copy/paste (latin + russian layout)
+keybind = ctrl+shift+c=copy_to_clipboard
+keybind = ctrl+shift+v=paste_from_clipboard
+keybind = ctrl+shift+с=copy_to_clipboard
+keybind = ctrl+shift+м=paste_from_clipboard

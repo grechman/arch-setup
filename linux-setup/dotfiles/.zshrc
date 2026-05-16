@@ -105,9 +105,133 @@ source $ZSH/oh-my-zsh.sh
 export PATH="$HOME/.local/bin:$PATH"
 export EDITOR=nvim
 export PATH=$PATH:$HOME/go/bin
-alias airpods='bluetoothctl connect CHANGEME'
-alias airpods-off='bluetoothctl disconnect CHANGEME'
+export ANTHROPIC_BASE_URL=http://127.0.0.1:18080
+export CLAUDE_CODE_API_BASE_URL=http://127.0.0.1:18080
+
+# Sandbox claude — routes through the sonnet-classifier proxy on :18081
+# instead of the prod opus proxy on :18080. Drop-in replacement for `claude`.
+claude-sandbox() {
+  ANTHROPIC_BASE_URL=http://127.0.0.1:18081 \
+  CLAUDE_CODE_API_BASE_URL=http://127.0.0.1:18081 \
+  command claude "$@"
+}
+alias airpods='bluetoothctl connect F0:D3:1F:65:57:44'
+alias airpods-off='bluetoothctl disconnect F0:D3:1F:65:57:44'
 alias vim='nvim'
+
+wallpaper-set() {
+    if [[ -z "$1" ]]; then
+        print -u2 "usage: wallpaper-set <path-to-image>"
+        return 1
+    fi
+    local image_path="${1/#\~/$HOME}"
+    image_path="${image_path:A}"
+    if [[ ! -f "$image_path" ]]; then
+        print -u2 "wallpaper-set: not a file: $image_path"
+        return 1
+    fi
+    print -r -- "splash = false
+
+wallpaper {
+    monitor =
+    path = $image_path
+    fit_mode = cover
+}" > ~/.config/hypr/hyprpaper.conf
+    pkill hyprpaper 2>/dev/null
+    sleep 0.3
+    hyprpaper >/dev/null 2>&1 & disown
+    print -- "wallpaper set: $image_path"
+}
+alias cc='claude --allow-dangerously-skip-permissions'
+alias cca=' claude agents --dangerously-skip-permissions --model opus\[1m\]  --effort max'
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 export PATH=~/.npm-global/bin:$PATH
 
+# tmux tabs: one shared `main` session with named windows.
+# `reload-tabs` reopens the persistent session. `newtab <name>` adds a new tab.
+# Inside tmux: switch with Alt+1..9, prev/next with Alt+h/Alt+l.
+alias reload-tabs='tmux new -A -s main'
+newtab() {
+    if [[ -z "$1" ]]; then
+        print -u2 "usage: newtab <name>"
+        return 1
+    fi
+    local name="${(j:-:)@}"
+    name="${name//[^A-Za-z0-9_-]/-}"
+    if [[ -n "$TMUX" ]]; then
+        tmux new-window -n "$name"
+    elif tmux has-session -t main 2>/dev/null; then
+        tmux new-window -t main: -n "$name"
+        tmux attach -t main
+    else
+        tmux new-session -s main -n "$name"
+    fi
+}
+
+# kill a tmux session by name; no args kills the whole server.
+tmkill() {
+    if [[ -z "$1" ]]; then
+        tmux kill-server 2>/dev/null && print "tmux server killed"
+    else
+        tmux kill-session -t "$1"
+    fi
+}
+
+# theme <name> | theme list | theme help
+# Flips the system theme across hyprland borders, ghostty, waybar, rofi, GTK,
+# KDE/Qt, and tmux.
+# Implementation: rewrites the active `source = ...themes/X.conf` line in
+# hyprland.conf, applies app colors directly, then runs `hyprctl reload` for
+# compositor-side colors.
+theme() {
+    local name="$1"
+    local hyprconf="$HOME/.config/hypr/hyprland.conf"
+    local themedir="$HOME/.config/hypr/themes"
+    local active=$(readlink "$HOME/.config/themes/active" 2>/dev/null)
+
+    typeset -A descriptions=(
+        rose-pine        "soft purple, calm"
+        gruvbox          "earthy yellow/orange, classic"
+        kanagawa-wave    "Japanese woodblock blues"
+        kanagawa-dragon  "ink-on-stone, very dark"
+        everforest-dark  "sage forest, mossy greens"
+        ayu-mirage       "warm cocoa, rust accents"
+        iceberg-dark     "cold blue, stone temple"
+        carbonfox        "matte black, IBM Carbon"
+    )
+
+    if [[ -z "$name" || "$name" == list || "$name" == help || "$name" == -h || "$name" == --help ]]; then
+        print "available themes:"
+        for f in "$themedir"/*.conf(N); do
+            local n="${f:t:r}"
+            local marker="  "
+            [[ "$n" == "$active" ]] && marker="● "
+            local desc="${descriptions[$n]:-}"
+            if [[ -n "$desc" ]]; then
+                printf "  %s%-18s %s\n" "$marker" "$n" "$desc"
+            else
+                printf "  %s%s\n" "$marker" "$n"
+            fi
+        done
+        print ""
+        print "usage: theme <name>"
+        return 0
+    fi
+
+    if [[ ! -f "$themedir/$name.conf" ]]; then
+        print -u2 "no such theme: $name"
+        print -u2 "run 'theme list' to see options"
+        return 1
+    fi
+
+    sed -i -E 's|^[[:space:]]*source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/[A-Za-z0-9_.-]+\.conf[[:space:]]*$|# &|' "$hyprconf"
+    sed -i -E "s|^#[[:space:]]*(source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/$name\.conf)[[:space:]]*\$|\1|" "$hyprconf"
+    "$HOME/.local/bin/theme-apply" "$name" >/dev/null 2>&1
+    hyprctl reload >/dev/null 2>&1
+    print "theme: $name"
+}
+
+
+# zoxide: smarter cd. `cd` is replaced by zoxide; `cdi` gives interactive pick.
+# Must be initialized last so its prefix-cd and chpwd hooks wrap everything.
+command -v zoxide >/dev/null && eval "$(zoxide init zsh --cmd cd)"

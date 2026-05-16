@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+# theme-apply <name> — point ~/.config/themes/active at <name>, then propagate
+# colors to ghostty, waybar, rofi, GTK, KDE/Qt, and tmux.
+
+set -u
+NAME="${1:?usage: theme-apply <theme-name>}"
+
+THEMES_DIR="$HOME/.config/themes"
+SRC="$THEMES_DIR/$NAME"
+ACTIVE="$THEMES_DIR/active"
+
+if [[ ! -d "$SRC" ]]; then
+    command -v notify-send >/dev/null && notify-send "theme-apply" "unknown theme: $NAME"
+    echo "theme-apply: unknown theme: $NAME" >&2
+    exit 1
+fi
+
+ln -snf "$NAME" "$ACTIVE"
+
+color() {
+    local key="$1"
+    awk -v key="$key" '
+        $1 == "@define-color" && $2 == key {
+            value = $3
+            gsub(/[;#]/, "", value)
+            print tolower(value)
+            exit
+        }
+    ' "$SRC/waybar-colors.css"
+}
+
+hex_rgb() {
+    local hex="$1"
+    printf '%d,%d,%d' "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+write_if_changed() {
+    local dst="$1"
+    local tmp
+    tmp="$(mktemp)"
+    cat >"$tmp"
+    if [[ ! -f "$dst" ]] || ! cmp -s "$tmp" "$dst"; then
+        install -Dm644 "$tmp" "$dst"
+    fi
+    rm -f "$tmp"
+}
+
+if [[ -f "$SRC/waybar-colors.css" ]]; then
+    bg="$(color bg)"
+    bg_alt="$(color bg_alt)"
+    fg="$(color fg)"
+    fg_muted="$(color fg_muted)"
+    fg_alt="$(color fg_alt)"
+    accent="$(color accent)"
+    hover="$(color hover)"
+    ok="$(color ok)"
+    warn="$(color warn)"
+    critical="$(color critical)"
+    info="$(color info)"
+    info_alt="$(color info_alt)"
+
+    rofi_bg="$(hex_rgb "$bg")"
+    rofi_bg_alt="$(hex_rgb "$bg_alt")"
+
+    write_if_changed "$HOME/.config/rofi/colors.rasi" <<EOF
+* {
+    bg:         rgba(${rofi_bg}, 0.35);
+    bg-alt:     rgba(${rofi_bg_alt}, 0.0);
+    bg-sel:     #${accent};
+    fg:         #${fg};
+    fg-dim:     #${fg_alt};
+    fg-sel:     #${bg};
+    accent:     #${hover};
+    border:     #${fg_muted};
+}
+EOF
+
+    write_if_changed "$HOME/.config/gtk-3.0/colors.css" <<EOF
+@define-color borders_breeze #${fg_muted};
+@define-color content_view_bg_breeze #${bg};
+@define-color error_color_backdrop_breeze #${critical};
+@define-color error_color_breeze #${critical};
+@define-color error_color_insensitive_backdrop_breeze #${bg_alt};
+@define-color error_color_insensitive_breeze #${bg_alt};
+@define-color insensitive_base_color_breeze #${bg};
+@define-color insensitive_base_fg_color_breeze #${fg_muted};
+@define-color insensitive_bg_color_breeze #${bg_alt};
+@define-color insensitive_borders_breeze #${bg_alt};
+@define-color insensitive_fg_color_breeze #${fg_muted};
+@define-color insensitive_selected_bg_color_breeze #${bg_alt};
+@define-color insensitive_selected_fg_color_breeze #${fg_muted};
+@define-color insensitive_unfocused_bg_color_breeze #${bg_alt};
+@define-color insensitive_unfocused_fg_color_breeze #${fg_muted};
+@define-color insensitive_unfocused_selected_bg_color_breeze #${bg_alt};
+@define-color insensitive_unfocused_selected_fg_color_breeze #${fg_muted};
+@define-color link_color_breeze #${info};
+@define-color link_visited_color_breeze #${info_alt};
+@define-color success_color_backdrop_breeze #${ok};
+@define-color success_color_breeze #${ok};
+@define-color success_color_insensitive_backdrop_breeze #${bg_alt};
+@define-color success_color_insensitive_breeze #${bg_alt};
+@define-color theme_base_color_breeze #${bg};
+@define-color theme_bg_color_breeze #${bg_alt};
+@define-color theme_button_background_backdrop_breeze #${bg_alt};
+@define-color theme_button_background_backdrop_insensitive_breeze #${bg_alt};
+@define-color theme_button_background_insensitive_breeze #${bg_alt};
+@define-color theme_button_background_normal_breeze #${bg_alt};
+@define-color theme_button_decoration_focus_backdrop_breeze #${accent};
+@define-color theme_button_decoration_focus_backdrop_insensitive_breeze #${fg_muted};
+@define-color theme_button_decoration_focus_breeze #${accent};
+@define-color theme_button_decoration_focus_insensitive_breeze #${fg_muted};
+@define-color theme_button_decoration_hover_backdrop_breeze #${hover};
+@define-color theme_button_decoration_hover_backdrop_insensitive_breeze #${fg_muted};
+@define-color theme_button_decoration_hover_breeze #${hover};
+@define-color theme_button_decoration_hover_insensitive_breeze #${fg_muted};
+@define-color theme_button_foreground_active_backdrop_breeze #${fg};
+@define-color theme_button_foreground_active_backdrop_insensitive_breeze #${fg_muted};
+@define-color theme_button_foreground_active_breeze #${fg};
+@define-color theme_button_foreground_active_insensitive_breeze #${fg_muted};
+@define-color theme_button_foreground_backdrop_breeze #${fg_alt};
+@define-color theme_button_foreground_backdrop_insensitive_breeze #${fg_muted};
+@define-color theme_button_foreground_insensitive_breeze #${fg_muted};
+@define-color theme_button_foreground_normal_breeze #${fg};
+@define-color theme_fg_color_breeze #${fg};
+@define-color theme_header_background_backdrop_breeze #${bg};
+@define-color theme_header_background_breeze #${bg_alt};
+@define-color theme_header_background_light_breeze #${bg};
+@define-color theme_header_foreground_backdrop_breeze #${fg_alt};
+@define-color theme_header_foreground_breeze #${fg};
+@define-color theme_header_foreground_insensitive_backdrop_breeze #${fg_muted};
+@define-color theme_header_foreground_insensitive_breeze #${fg_muted};
+@define-color theme_hovering_selected_bg_color_breeze #${hover};
+@define-color theme_selected_bg_color_breeze #${accent};
+@define-color theme_selected_fg_color_breeze #${bg};
+@define-color theme_text_color_breeze #${fg};
+@define-color theme_titlebar_background_backdrop_breeze #${bg};
+@define-color theme_titlebar_background_breeze #${bg_alt};
+@define-color theme_titlebar_background_light_breeze #${bg};
+@define-color theme_titlebar_foreground_backdrop_breeze #${fg_alt};
+@define-color theme_titlebar_foreground_breeze #${fg};
+@define-color theme_titlebar_foreground_insensitive_backdrop_breeze #${fg_muted};
+@define-color theme_titlebar_foreground_insensitive_breeze #${fg_muted};
+@define-color theme_unfocused_base_color_breeze #${bg};
+@define-color theme_unfocused_bg_color_breeze #${bg_alt};
+@define-color theme_unfocused_fg_color_breeze #${fg_alt};
+@define-color theme_unfocused_selected_bg_color_alt_breeze #${bg_alt};
+@define-color theme_unfocused_selected_bg_color_breeze #${bg_alt};
+@define-color theme_unfocused_selected_fg_color_breeze #${fg};
+@define-color theme_unfocused_text_color_breeze #${fg_alt};
+@define-color theme_unfocused_view_bg_color_breeze #${bg};
+@define-color theme_unfocused_view_text_color_breeze #${fg_muted};
+@define-color theme_view_active_decoration_color_breeze #${accent};
+@define-color theme_view_hover_decoration_color_breeze #${hover};
+@define-color tooltip_background_breeze #${bg_alt};
+@define-color tooltip_border_breeze #${fg_muted};
+@define-color tooltip_text_breeze #${fg};
+@define-color unfocused_borders_breeze #${fg_muted};
+@define-color unfocused_insensitive_borders_breeze #${bg_alt};
+@define-color warning_color_backdrop_breeze #${warn};
+@define-color warning_color_breeze #${warn};
+@define-color warning_color_insensitive_backdrop_breeze #${bg_alt};
+@define-color warning_color_insensitive_breeze #${bg_alt};
+EOF
+
+    cp "$HOME/.config/gtk-3.0/colors.css" "$HOME/.config/gtk-4.0/colors.css"
+
+    bg_rgb="$(hex_rgb "$bg")"
+    bg_alt_rgb="$(hex_rgb "$bg_alt")"
+    fg_rgb="$(hex_rgb "$fg")"
+    fg_muted_rgb="$(hex_rgb "$fg_muted")"
+    fg_alt_rgb="$(hex_rgb "$fg_alt")"
+    accent_rgb="$(hex_rgb "$accent")"
+    hover_rgb="$(hex_rgb "$hover")"
+    ok_rgb="$(hex_rgb "$ok")"
+    warn_rgb="$(hex_rgb "$warn")"
+    critical_rgb="$(hex_rgb "$critical")"
+    info_rgb="$(hex_rgb "$info")"
+    info_alt_rgb="$(hex_rgb "$info_alt")"
+
+    kdeglobals="$HOME/.config/kdeglobals"
+    if [[ -f "$kdeglobals" ]]; then
+        BG="$bg_rgb" BG_ALT="$bg_alt_rgb" FG="$fg_rgb" FG_MUTED="$fg_muted_rgb" FG_ALT="$fg_alt_rgb" \
+        ACCENT="$accent_rgb" HOVER="$hover_rgb" OK="$ok_rgb" WARN="$warn_rgb" CRITICAL="$critical_rgb" \
+        INFO="$info_rgb" INFO_ALT="$info_alt_rgb" \
+        perl -0pi -e '
+            my %v = (
+                bg => $ENV{BG},
+                bg_alt => $ENV{BG_ALT},
+                fg => $ENV{FG},
+                fg_muted => $ENV{FG_MUTED},
+                fg_alt => $ENV{FG_ALT},
+                accent => $ENV{ACCENT},
+                hover => $ENV{HOVER},
+                ok => $ENV{OK},
+                warn => $ENV{WARN},
+                critical => $ENV{CRITICAL},
+                info => $ENV{INFO},
+                info_alt => $ENV{INFO_ALT},
+            );
+            sub section {
+                my ($name, $body) = @_;
+                s/\Q[$name]\E\n(?:[^\[].*\n?)*/"[$name]\n$body"/e;
+            }
+            my $button = "BackgroundAlternate=$v{accent}\nBackgroundNormal=$v{bg_alt}\nDecorationFocus=$v{accent}\nDecorationHover=$v{hover}\nForegroundActive=$v{accent}\nForegroundInactive=$v{fg_muted}\nForegroundLink=$v{info}\nForegroundNegative=$v{critical}\nForegroundNeutral=$v{warn}\nForegroundNormal=$v{fg}\nForegroundPositive=$v{ok}\nForegroundVisited=$v{info_alt}\n";
+            my $selection = "BackgroundAlternate=$v{hover}\nBackgroundNormal=$v{accent}\nDecorationFocus=$v{accent}\nDecorationHover=$v{hover}\nForegroundActive=$v{fg}\nForegroundInactive=$v{fg}\nForegroundLink=$v{info}\nForegroundNegative=$v{critical}\nForegroundNeutral=$v{warn}\nForegroundNormal=$v{bg}\nForegroundPositive=$v{ok}\nForegroundVisited=$v{info_alt}\n";
+            my $view = "BackgroundAlternate=$v{bg_alt}\nBackgroundNormal=$v{bg}\nDecorationFocus=$v{accent}\nDecorationHover=$v{hover}\nForegroundActive=$v{accent}\nForegroundInactive=$v{fg_muted}\nForegroundLink=$v{info}\nForegroundNegative=$v{critical}\nForegroundNeutral=$v{warn}\nForegroundNormal=$v{fg}\nForegroundPositive=$v{ok}\nForegroundVisited=$v{info_alt}\n";
+            my $window = "BackgroundAlternate=$v{bg_alt}\nBackgroundNormal=$v{bg_alt}\nDecorationFocus=$v{accent}\nDecorationHover=$v{hover}\nForegroundActive=$v{accent}\nForegroundInactive=$v{fg_muted}\nForegroundLink=$v{info}\nForegroundNegative=$v{critical}\nForegroundNeutral=$v{warn}\nForegroundNormal=$v{fg}\nForegroundPositive=$v{ok}\nForegroundVisited=$v{info_alt}\n";
+            section("Colors:Button", $button);
+            section("Colors:Complementary", $window);
+            section("Colors:Header", $window);
+            section("Colors:Header][Inactive", $window);
+            section("Colors:Selection", $selection);
+            section("Colors:Tooltip", $window);
+            section("Colors:View", $view);
+            section("Colors:Window", $window);
+            section("WM", "activeBackground=$v{bg_alt}\nactiveBlend=$v{fg}\nactiveForeground=$v{fg}\ninactiveBackground=$v{bg}\ninactiveBlend=$v{fg_alt}\ninactiveForeground=$v{fg_alt}\n");
+        ' "$kdeglobals"
+    fi
+fi
+
+# --- ghostty ---
+if [[ -f "$SRC/ghostty-theme" ]]; then
+    ghostty_theme="$(<"$SRC/ghostty-theme")"
+    ghostty_conf="$HOME/.config/ghostty/config"
+    [[ -f "$ghostty_conf" ]] && \
+        sed -i -E "s|^[[:space:]]*theme[[:space:]]*=.*|theme = ${ghostty_theme}|" "$ghostty_conf"
+    pkill -SIGUSR2 -x ghostty 2>/dev/null || true
+fi
+
+# --- waybar ---
+if [[ -f "$SRC/waybar-colors.css" ]]; then
+    if [[ ! -f "$HOME/.config/waybar/colors.css" ]] || ! cmp -s "$SRC/waybar-colors.css" "$HOME/.config/waybar/colors.css"; then
+        cp "$SRC/waybar-colors.css" "$HOME/.config/waybar/colors.css"
+        waybar_changed=1
+    else
+        waybar_changed=0
+    fi
+    if [[ "$waybar_changed" == 1 ]] && pgrep -x waybar >/dev/null; then
+        pkill -x waybar 2>/dev/null || true
+        ( waybar >/dev/null 2>&1 & disown ) || true
+    fi
+fi
+
+# --- tmux ---
+if tmux info >/dev/null 2>&1; then
+    tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+fi
+
+exit 0

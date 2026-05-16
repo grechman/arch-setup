@@ -1,0 +1,10 @@
+* {
+    bg:         rgba(24,22,22, 0.35);
+    bg-alt:     rgba(40,39,39, 0.0);
+    bg-sel:     #658594;
+    fg:         #c5c9c5;
+    fg-dim:     #a6a69c;
+    fg-sel:     #181616;
+    accent:     #a292a3;
+    border:     #625e5a;
+}

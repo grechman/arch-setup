@@ -1,0 +1,15 @@
+/* rose pine */
+@define-color bg        #191724;
+@define-color bg_alt    #1f1d2e;
+@define-color fg        #e0def4;
+@define-color fg_muted  #6e6a86;
+@define-color fg_alt    #908caa;
+@define-color accent    #c4a7e7;
+@define-color hover     #ebbcba;
+@define-color ok        #9ccfd8;
+@define-color warn      #f6c177;
+@define-color critical  #eb6f92;
+@define-color info      #9ccfd8;
+@define-color info_alt  #31748f;
+@define-color cpu_color #ebbcba;
+@define-color mem_color #c4a7e7;

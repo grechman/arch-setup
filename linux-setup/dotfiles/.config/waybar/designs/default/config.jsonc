@@ -1,0 +1,109 @@
+{
+    "position": "top",
+    "modules-left": ["hyprland/workspaces", "custom/notif-text"],
+    "modules-center": ["custom/swaync", "clock"],
+    "modules-right": ["hyprland/language", "pulseaudio", "custom/network", "cpu", "memory", "battery", "tray", "custom/lock"],
+
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "on-click": "activate",
+        "persistent-workspaces": {
+            "*": 5
+        },
+        "format-icons": {
+            "1": "一",
+            "2": "二",
+            "3": "三",
+            "4": "四",
+            "5": "五",
+            "6": "六",
+            "7": "七",
+            "8": "八",
+            "9": "九",
+            "10": "十"
+        }
+    },
+
+    "clock": {
+        "timezone": "Europe/Moscow",
+        "format": "{:%d - %H:%M}",
+        "format-alt": "{:%Y-%m-%d}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "cpu": {
+        "interval": 1,
+        "format": " {usage}% {icon}",
+        "format-icons": ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+    },
+
+    "memory": {
+        "interval": 1,
+        "format": " {used:0.1f}G/{total:0.1f}G"
+    },
+
+    "custom/network": {
+        "exec": "~/.config/waybar/wifi-status.sh",
+        "return-type": "json",
+        "interval": 5,
+        "tooltip": true
+    },
+
+    "hyprland/language": {
+        "format": "{short}"
+    },
+
+    "pulseaudio": {
+        "format": " {volume}%",
+        "format-muted": " muted",
+        "on-click": "pavucontrol"
+    },
+
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    },
+
+    "battery": {
+        "interval": 30,
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    },
+
+    "custom/lock": {
+        "format": "󰌾",
+        "on-click": "sleep 0.5 && hyprlock"
+    },
+
+    "custom/notif-text": {
+        "tooltip": false,
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/notif-text.sh",
+        "markup": true
+    },
+
+    "custom/swaync": {
+        "tooltip": false,
+        "format": "<span font-size='small' rise='3500'>{}</span>{icon}",
+        "format-icons": {
+            "notification": "󰂚",
+            "none": "󰂜",
+            "new": "󰂚",
+            "dnd-notification": "󱅫",
+            "dnd-none": "󱅫",
+            "dnd-new": "󱅫"
+        },
+        "return-type": "json",
+        "exec-if": "which swaync-client",
+        "exec": "~/.config/waybar/swaync-status.sh",
+        "on-click": "swaync-client -t -sw",
+        "on-click-right": "swaync-client -d -sw",
+        "escape": true
+    }
+}

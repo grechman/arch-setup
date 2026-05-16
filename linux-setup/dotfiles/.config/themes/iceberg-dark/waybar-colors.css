@@ -1,0 +1,15 @@
+/* iceberg dark */
+@define-color bg        #161821;
+@define-color bg_alt    #1e2132;
+@define-color fg        #c6c8d1;
+@define-color fg_muted  #6b7089;
+@define-color fg_alt    #818596;
+@define-color accent    #84a0c6;
+@define-color hover     #89b8c2;
+@define-color ok        #b4be82;
+@define-color warn      #e2a478;
+@define-color critical  #e27878;
+@define-color info      #89b8c2;
+@define-color info_alt  #a093c7;
+@define-color cpu_color #e2a478;
+@define-color mem_color #a093c7;

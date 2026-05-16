@@ -1,0 +1,15 @@
+/* everforest dark hard */
+@define-color bg        #272e33;
+@define-color bg_alt    #2e383c;
+@define-color fg        #d3c6aa;
+@define-color fg_muted  #7a8478;
+@define-color fg_alt    #859289;
+@define-color accent    #a7c080;
+@define-color hover     #83c092;
+@define-color ok        #a7c080;
+@define-color warn      #dbbc7f;
+@define-color critical  #e67e80;
+@define-color info      #7fbbb3;
+@define-color info_alt  #83c092;
+@define-color cpu_color #e69875;
+@define-color mem_color #d699b6;

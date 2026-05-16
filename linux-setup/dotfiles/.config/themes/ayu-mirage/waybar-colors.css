@@ -1,0 +1,15 @@
+/* ayu mirage */
+@define-color bg        #1f2430;
+@define-color bg_alt    #1c212b;
+@define-color fg        #cbccc6;
+@define-color fg_muted  #5c6773;
+@define-color fg_alt    #707a8c;
+@define-color accent    #ffa759;
+@define-color hover     #ffcc66;
+@define-color ok        #bae67e;
+@define-color warn      #ffcc66;
+@define-color critical  #f28779;
+@define-color info      #5ccfe6;
+@define-color info_alt  #73d0ff;
+@define-color cpu_color #ffa759;
+@define-color mem_color #d4bfff;

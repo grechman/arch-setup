@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+base="$HOME/.config/waybar"
+designs="$base/designs"
+log="${XDG_RUNTIME_DIR:-/tmp}/waybar-set.log"
+
+usage() {
+    printf 'usage: waybar-set <design>\n\n'
+    printf 'designs:\n'
+    find "$designs" -mindepth 1 -maxdepth 1 -type d -printf '  %f\n' | sort
+}
+
+restart_waybar() {
+    pkill -x waybar 2>/dev/null || true
+    pkill -f "$HOME/.config/waybar/notif-text.sh" 2>/dev/null || true
+    pkill -f "$HOME/.config/waybar/swaync-status.sh" 2>/dev/null || true
+    pkill -f "dbus-monitor --session interface='org.freedesktop.Notifications',member='Notif[y]'" 2>/dev/null || true
+    sleep 0.2
+    nohup waybar >"$log" 2>&1 &
+}
+
+if [[ $# -ne 1 || "$1" == "-h" || "$1" == "--help" || "$1" == "list" ]]; then
+    usage
+    exit 0
+fi
+
+name="$1"
+src="$designs/$name"
+
+if [[ ! -d "$src" ]]; then
+    printf 'waybar-set: unknown design: %s\n\n' "$name" >&2
+    usage >&2
+    exit 1
+fi
+
+for file in config.jsonc style.css; do
+    if [[ ! -f "$src/$file" ]]; then
+        printf 'waybar-set: design %s is missing %s\n' "$name" "$file" >&2
+        exit 1
+    fi
+done
+
+install -m 0644 "$src/config.jsonc" "$base/config.jsonc"
+install -m 0644 "$src/style.css" "$base/style.css"
+printf '%s\n' "$name" >"$base/current-design"
+restart_waybar
+printf 'Waybar design set to %s\n' "$name"
+printf 'Log: %s\n' "$log"

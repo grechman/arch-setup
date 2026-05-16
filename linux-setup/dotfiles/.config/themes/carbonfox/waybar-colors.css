@@ -1,0 +1,15 @@
+/* carbonfox — IBM Carbon-inspired */
+@define-color bg        #0c0c0d;
+@define-color bg_alt    #161616;
+@define-color fg        #f2f4f8;
+@define-color fg_muted  #7b7c7e;
+@define-color fg_alt    #b6b8bb;
+@define-color accent    #78a9ff;
+@define-color hover     #be95ff;
+@define-color ok        #25be6a;
+@define-color warn      #08bdba;
+@define-color critical  #ee5396;
+@define-color info      #33b1ff;
+@define-color info_alt  #be95ff;
+@define-color cpu_color #ff7eb6;
+@define-color mem_color #be95ff;
