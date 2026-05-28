@@ -1,0 +1,15 @@
+/* rose pine moon */
+@define-color bg        #232136;
+@define-color bg_alt    #2a273f;
+@define-color fg        #e0def4;
+@define-color fg_muted  #6e6a86;
+@define-color fg_alt    #908caa;
+@define-color accent    #c4a7e7;
+@define-color hover     #ea9a97;
+@define-color ok        #9ccfd8;
+@define-color warn      #f6c177;
+@define-color critical  #eb6f92;
+@define-color info      #9ccfd8;
+@define-color info_alt  #3e8fb0;
+@define-color cpu_color #ea9a97;
+@define-color mem_color #c4a7e7;

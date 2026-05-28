@@ -191,6 +191,7 @@ theme() {
 
     typeset -A descriptions=(
         rose-pine        "soft purple, calm"
+        rose-pine-moon   "brighter Rosé Pine dark"
         gruvbox          "earthy yellow/orange, classic"
         kanagawa-wave    "Japanese woodblock blues"
         kanagawa-dragon  "ink-on-stone, very dark"
