@@ -1,0 +1,45 @@
+# Minimal SearXNG config for Kira. Merges on top of upstream defaults.
+# Bound to loopback only (see docker-compose.yml), so the limiter/botdetection
+# is turned off to allow programmatic JSON access. Re-enable both if you ever
+# expose this beyond 127.0.0.1.
+#
+# Engine set is pinned to ones that actually answer from our shared egress IPs.
+# google (CAPTCHA /sorry/), brave (HTTP 429), duckduckgo (timeout / ISP-blocked)
+# and startpage (broken parser) only ever return empty, so keep_only drops them.
+# bing and mojeek ship disabled-by-default upstream, so they're re-enabled below;
+# wikipedia/wikidata cover facts. Widen only after confirming an engine returns
+# results: curl the JSON API with &engines=<name>.
+use_default_settings:
+  engines:
+    keep_only:
+      - bing
+      - mojeek
+      - wikipedia
+      - wikidata
+
+# Re-enable the two general engines upstream ships as disabled-by-default.
+engines:
+  - name: bing
+    disabled: false
+  - name: mojeek
+    disabled: false
+
+server:
+  # Replaced with a random value at install time (see README / install block).
+  secret_key: "REPLACE_ME_random_string"
+  limiter: false
+  image_proxy: true
+
+search:
+  # The JSON API is what web_search talks to; html is kept for manual browsing.
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""
+
+outgoing:
+  # Default 3s is too tight for our proxied egress; slower engines (wikipedia)
+  # were getting cut off mid-request and logged as timeouts.
+  request_timeout: 8.0
+  max_request_timeout: 15.0

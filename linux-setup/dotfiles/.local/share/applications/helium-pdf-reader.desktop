@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Name=Helium PDF Reader
+GenericName=PDF Reader
+Comment=Open PDFs in a clean Helium app window
+Exec=helium-browser --user-data-dir=/home/grechman/.cache/helium-pdf-reader --no-first-run --app=%U
+StartupNotify=true
+StartupWMClass=helium
+Terminal=false
+Icon=helium-browser
+Type=Application
+Categories=Office;Viewer;
+MimeType=application/pdf;
+NoDisplay=true

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Name=Helium HTML Reader
+GenericName=HTML Reader
+Comment=Open local HTML files in a clean Helium app window
+Exec=helium-browser --app=%U
+StartupNotify=true
+StartupWMClass=helium
+Terminal=false
+Icon=helium-browser
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;
+NoDisplay=true

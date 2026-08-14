@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# web_search "<query>" [--count N] [--raw]
+# Query the local SearXNG instance and print ranked title / url / snippet.
+# Override the endpoint with KIRA_SEARX_URL if needed.
+set -euo pipefail
+
+SEARX_URL="${KIRA_SEARX_URL:-http://127.0.0.1:8888}"
+count=8
+raw=0
+query=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --count) count="${2:?--count needs a number}"; shift 2 ;;
+    --raw|--json) raw=1; shift ;;
+    -h|--help) echo "usage: web_search <query> [--count N] [--raw]"; exit 0 ;;
+    --) shift; query="${query:+$query }$*"; break ;;
+    -*) echo "web_search: unknown flag: $1" >&2; exit 2 ;;
+    *) query="${query:+$query }$1"; shift ;;
+  esac
+done
+
+[ -n "$query" ] || { echo "usage: web_search <query> [--count N] [--raw]" >&2; exit 2; }
+
+resp=$(curl -fsS --get "$SEARX_URL/search" \
+  --data-urlencode "q=$query" \
+  --data-urlencode "format=json" \
+  --data-urlencode "safesearch=0") || {
+    echo "web_search: cannot reach SearXNG at $SEARX_URL (is the kira-web stack up?)" >&2
+    exit 1
+  }
+
+if [ "$raw" = 1 ]; then
+  printf '%s\n' "$resp"
+  exit 0
+fi
+
+printf '%s' "$resp" | jq -r --argjson n "$count" '
+  if (.results | length) == 0 then "no results"
+  else
+    .results[:$n] | to_entries[] |
+    "[\(.key + 1)] \(.value.title)\n    \(.value.url)\n    \(((.value.content // "") | gsub("[\\n\\t]+"; " "))[0:300])\n"
+  end'

@@ -1,0 +1,19 @@
+# Minimal SearXNG config for Kira. Merges on top of upstream defaults.
+# Bound to loopback only (see docker-compose.yml), so the limiter/botdetection
+# is turned off to allow programmatic JSON access. Re-enable both if you ever
+# expose this beyond 127.0.0.1.
+use_default_settings: true
+
+server:
+  # Replaced with a random value at install time (see README / install block).
+  secret_key: "50de36a32e121cac4b2a0ee9f5d2425170315f27d17e6b3683fb438d18ca0664"
+  limiter: false
+  image_proxy: true
+
+search:
+  # The JSON API is what web_search talks to; html is kept for manual browsing.
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""

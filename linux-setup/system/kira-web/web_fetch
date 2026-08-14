@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# web_fetch <url> [<url> ...] [--fast|--dynamic]
+# Fetch one or many pages as clean markdown via the local kira-fetch service.
+#   --fast    (default) curl + trafilatura, static pages, no browser
+#   --dynamic           crawl4ai headless Chromium, renders JS
+# Per-page results are printed as delimited blocks. Thin/errored slots are
+# reported to stderr so stdout stays clean markdown.
+# Override the endpoint with KIRA_FETCH_URL if needed.
+set -euo pipefail
+
+FETCH_URL="${KIRA_FETCH_URL:-http://127.0.0.1:8899}"
+THIN="${KIRA_FETCH_THIN:-40}"
+mode=fast
+urls=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fast) mode=fast; shift ;;
+    --dynamic) mode=dynamic; shift ;;
+    -h|--help) echo "usage: web_fetch <url> [<url> ...] [--fast|--dynamic]"; exit 0 ;;
+    --) shift; while [ $# -gt 0 ]; do urls+=("$1"); shift; done ;;
+    -*) echo "web_fetch: unknown flag: $1" >&2; exit 2 ;;
+    *) urls+=("$1"); shift ;;
+  esac
+done
+
+[ "${#urls[@]}" -gt 0 ] || { echo "usage: web_fetch <url> [<url> ...] [--fast|--dynamic]" >&2; exit 2; }
+
+payload=$(jq -nc --arg mode "$mode" '{mode:$mode, urls:$ARGS.positional}' --args "${urls[@]}")
+
+resp=$(curl -fsS -X POST "$FETCH_URL/fetch" \
+  -H 'content-type: application/json' \
+  -d "$payload") || {
+    echo "web_fetch: cannot reach fetch service at $FETCH_URL (is the kira-web stack up?)" >&2
+    exit 1
+  }
+
+# stdout: clean, delimited per-page markdown blocks.
+printf '%s' "$resp" | jq -r '
+  .results | to_entries[] |
+  (.key + 1) as $i | .value as $r |
+  if ($r.error != null) then
+    "===== [\($i)] \($r.url)  (\($r.mode // "fast"), ERROR: \($r.error)) ====="
+  else
+    "===== [\($i)] \($r.url)  (\($r.mode), \($r.words) words) =====\n\($r.markdown)"
+  end, ""'
+
+# stderr: hints for thin or errored slots (the model uses these to decide --dynamic).
+printf '%s' "$resp" | jq -r --argjson thin "$THIN" '
+  .results | to_entries[] | (.key + 1) as $i | .value as $r |
+  if ($r.error != null) then "web_fetch: [\($i)] \($r.url) failed: \($r.error)"
+  elif (($r.words // 0) < $thin) then "web_fetch: [\($i)] thin result (\($r.words) words), consider --dynamic"
+  else empty end' 1>&2 || true
