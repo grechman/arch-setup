@@ -103,18 +103,15 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 export PATH="$HOME/.local/bin:$PATH"
+export NVM_DIR="$HOME/.nvm"
+[ -s /usr/share/nvm/init-nvm.sh ] && source /usr/share/nvm/init-nvm.sh
 export EDITOR=nvim
 export PATH=$PATH:$HOME/go/bin
-export ANTHROPIC_BASE_URL=http://127.0.0.1:18080
-export CLAUDE_CODE_API_BASE_URL=http://127.0.0.1:18080
+# Disabled 2026-06-23: usage-proxy retired (only did usage; now via ~/.claude/usage-merge.sh).
+# Claude talks directly to api.anthropic.com. Re-add both lines to restore the proxy route.
+# export ANTHROPIC_BASE_URL=http://127.0.0.1:18080
+# export CLAUDE_CODE_API_BASE_URL=http://127.0.0.1:18080
 
-# Sandbox claude — routes through the sonnet-classifier proxy on :18081
-# instead of the prod opus proxy on :18080. Drop-in replacement for `claude`.
-claude-sandbox() {
-  ANTHROPIC_BASE_URL=http://127.0.0.1:18081 \
-  CLAUDE_CODE_API_BASE_URL=http://127.0.0.1:18081 \
-  command claude "$@"
-}
 alias airpods='bluetoothctl connect F0:D3:1F:65:57:44'
 alias airpods-off='bluetoothctl disconnect F0:D3:1F:65:57:44'
 alias vim='nvim'
@@ -142,10 +139,14 @@ wallpaper {
     hyprpaper >/dev/null 2>&1 & disown
     print -- "wallpaper set: $image_path"
 }
-alias cc='claude --allow-dangerously-skip-permissions'
-alias cca=' claude agents --dangerously-skip-permissions --model opus\[1m\]  --effort max'
+alias cc='claude --allow-dangerously-skip-permissions --model fable'
+alias cca='claude agents --allow-dangerously-skip-permissions --model fable --effort xhigh --settings '\''{"ultracode":false}'\'''
+alias ccl='claude --model sonnet --effort low --dangerously-skip-permissions'
+alias ccel='CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=1 claude --model sonnet --effort low --dangerously-skip-permissions'
+alias ccstyle='tweakcc --apply'
+alias ccstyle-update='npm install -g tweakcc@latest'
+alias kc='kiro-cli'
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-export PATH=~/.npm-global/bin:$PATH
 
 # tmux tabs: one shared `main` session with named windows.
 # `reload-tabs` reopens the persistent session. `newtab <name>` adds a new tab.
@@ -180,13 +181,14 @@ tmkill() {
 # theme <name> | theme list | theme help
 # Flips the system theme across hyprland borders, ghostty, waybar, rofi, GTK,
 # KDE/Qt, and tmux.
-# Implementation: rewrites the active `source = ...themes/X.conf` line in
-# hyprland.conf, applies app colors directly, then runs `hyprctl reload` for
-# compositor-side colors.
+# Implementation: updates ~/.config/themes/active, applies app colors directly,
+# keeps the legacy hyprland.conf source line in sync during migration, then
+# runs `hyprctl reload` so the active config path reads the new theme.
 theme() {
     local name="$1"
-    local hyprconf="$HOME/.config/hypr/hyprland.conf"
-    local themedir="$HOME/.config/hypr/themes"
+    local themedir="$HOME/.config/themes"
+    local legacy_hyprconf="$HOME/.config/hypr/hyprland.conf"
+    local legacy_themedir="$HOME/.config/hypr/themes"
     local active=$(readlink "$HOME/.config/themes/active" 2>/dev/null)
 
     typeset -A descriptions=(
@@ -199,12 +201,14 @@ theme() {
         ayu-mirage       "warm cocoa, rust accents"
         iceberg-dark     "cold blue, stone temple"
         carbonfox        "matte black, IBM Carbon"
+        bright-sun       "high-contrast light"
     )
 
     if [[ -z "$name" || "$name" == list || "$name" == help || "$name" == -h || "$name" == --help ]]; then
         print "available themes:"
-        for f in "$themedir"/*.conf(N); do
-            local n="${f:t:r}"
+        for f in "$themedir"/*(/N); do
+            [[ "${f:t}" == active ]] && continue
+            local n="${f:t}"
             local marker="  "
             [[ "$n" == "$active" ]] && marker="● "
             local desc="${descriptions[$n]:-}"
@@ -219,20 +223,87 @@ theme() {
         return 0
     fi
 
-    if [[ ! -f "$themedir/$name.conf" ]]; then
+    if [[ ! -d "$themedir/$name" ]]; then
         print -u2 "no such theme: $name"
         print -u2 "run 'theme list' to see options"
         return 1
     fi
 
-    sed -i -E 's|^[[:space:]]*source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/[A-Za-z0-9_.-]+\.conf[[:space:]]*$|# &|' "$hyprconf"
-    sed -i -E "s|^#[[:space:]]*(source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/$name\.conf)[[:space:]]*\$|\1|" "$hyprconf"
-    "$HOME/.local/bin/theme-apply" "$name" >/dev/null 2>&1
+    if ! "$HOME/.local/bin/theme-apply" "$name" >/dev/null; then
+        print -u2 "theme-apply failed: $name"
+        return 1
+    fi
+    if [[ -f "$legacy_hyprconf" && -f "$legacy_themedir/$name.conf" ]]; then
+        sed -i -E 's|^[[:space:]]*source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/[A-Za-z0-9_.-]+\.conf[[:space:]]*$|# &|' "$legacy_hyprconf"
+        sed -i -E "s|^#[[:space:]]*(source[[:space:]]*=[[:space:]]*~/\.config/hypr/themes/$name\.conf)[[:space:]]*\$|\1|" "$legacy_hyprconf"
+    fi
     hyprctl reload >/dev/null 2>&1
     print "theme: $name"
+}
+
+pacmani() {
+    emulate -L zsh
+
+    if ! command -v fzf >/dev/null; then
+        print -u2 "pacmani: fzf is not installed"
+        return 127
+    fi
+
+    local selected
+    selected="$(
+        pacman -Slq 2>/dev/null |
+            fzf --multi --layout=reverse --height=80% --border \
+                --prompt='pacman -S> ' \
+                --query="$*" \
+                --preview='pacman -Si {1} 2>/dev/null' \
+                --preview-window='right:60%:wrap'
+    )" || return $?
+
+    local -a packages
+    packages=("${(@f)selected}")
+    (( ${#packages[@]} )) || return 0
+
+    sudo pacman -S --needed -- "${packages[@]}"
+}
+
+yayi() {
+    emulate -L zsh
+
+    if ! command -v fzf >/dev/null; then
+        print -u2 "yayi: fzf is not installed"
+        return 127
+    fi
+
+    local selected
+    selected="$(
+        yay -Slq 2>/dev/null |
+            fzf --multi --layout=reverse --height=80% --border \
+                --prompt='yay -S> ' \
+                --query="$*" \
+                --preview='yay -Si {1} 2>/dev/null' \
+                --preview-window='right:60%:wrap'
+    )" || return $?
+
+    local -a packages
+    packages=("${(@f)selected}")
+    (( ${#packages[@]} )) || return 0
+
+    yay -S --needed -- "${packages[@]}"
 }
 
 
 # zoxide: smarter cd. `cd` is replaced by zoxide; `cdi` gives interactive pick.
 # Must be initialized last so its prefix-cd and chpwd hooks wrap everything.
 command -v zoxide >/dev/null && eval "$(zoxide init zsh --cmd cd)"
+# KIRO_API_KEY set locally, not in repo
+
+# Launch Eador: Genesis fullscreen (gamescope upscales the native 1024x768 to the
+# monitor; runs in a subshell so it doesn't move the shell, output silenced).
+eador() {
+    ( cd /home/grechman/grechman/eador/eador &&
+        gamescope -w 1024 -h 768 -W 1920 -H 1080 -f -- wine Eador.exe ) >/dev/null 2>&1
+}
+
+# windows dev server (tailscale)
+alias windows='ssh -t maxgrechkov@100.123.98.112 "wsl -d Ubuntu --cd ~"'
+alias winps='ssh -t maxgrechkov@100.123.98.112 powershell'

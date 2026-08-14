@@ -1,15 +1,13 @@
 {
     "position": "top",
-    "modules-left": ["hyprland/workspaces", "custom/notif-text"],
+    "modules-left": ["ext/workspaces", "custom/notif-text"],
     "modules-center": ["custom/swaync", "clock"],
     "modules-right": ["hyprland/language", "pulseaudio", "custom/network", "cpu", "memory", "battery", "tray", "custom/lock"],
 
-    "hyprland/workspaces": {
+    "ext/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
-        "persistent-workspaces": {
-            "*": 5
-        },
+        "sort-by-name": true,
         "format-icons": {
             "1": "一",
             "2": "二",

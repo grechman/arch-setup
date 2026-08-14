@@ -1,14 +1,14 @@
 {
     "position": "top",
     "height": 27,
-    "modules-left": ["hyprland/workspaces"],
+    "modules-left": ["ext/workspaces"],
     "modules-center": ["clock"],
-    "modules-right": ["hyprland/language", "network", "pulseaudio", "battery", "custom/notif"],
+    "modules-right": ["hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
 
-    "hyprland/workspaces": {
+    "ext/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
-        "persistent-workspaces": { "*": 5 },
+        "sort-by-name": true,
         "format-icons": {
             "active": "●",
             "default": "•"
@@ -24,17 +24,27 @@
 
     "battery": {
         "interval": 2,
-        "states": { "warning": 30, "critical": 15 },
-        "format": "bat {capacity}%",
-        "format-charging": "bat +{capacity}%",
-        "format-discharging": "bat {capacity}%",
-        "format-full": "bat {capacity}%"
+        "states": { "warning": 30, "low": 15, "critical": 5 },
+        "format": "{icon}",
+        "format-charging": "{icon}",
+        "format-discharging": "{icon}",
+        "format-full": "{icon}",
+        "format-icons": {
+            "default": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+            "charging": ["󰢟", "󰢜", "󰂆", "󰂇", "󰂈", "󰢝", "󰂉", "󰢞", "󰂊", "󰂋", "󰂅"]
+        },
+        "tooltip-format": "{capacity}% {timeTo}"
     },
 
     "pulseaudio": {
-        "format": "vol {volume}%",
-        "format-muted": "vol 0%",
-        "on-click": "pavucontrol"
+        "format": "{icon}",
+        "format-muted": "",
+        "format-icons": {
+            "default": ["", "", ""]
+        },
+        "tooltip-format": "{volume}%",
+        "scroll-step": 5,
+        "on-click": "~/.config/waybar/volume-popup.py"
     },
 
     "network": {
@@ -42,7 +52,8 @@
         "format-ethernet": "󰈀",
         "format-disconnected": "󰤭",
         "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
-        "tooltip": false
+        "tooltip": false,
+        "on-click": "~/.config/waybar/wifi-menu.sh"
     },
 
     "hyprland/language": {

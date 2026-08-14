@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+conf="${TERMINAL_BLUR_CONFIG:-$HOME/.config/hypr/hyprland.lua}"
+
+if [[ ! -f "$conf" ]]; then
+    printf 'terminal-blur: config not found: %s\n' "$conf" >&2
+    exit 1
+fi
+
+# no_blur rules for every terminal we keep in lockstep.
+#   active (uncommented) => no blur => terminal is plain transparent
+#   commented            => blur applies => terminal is frosted
+rules=(
+    'hl.window_rule({ name = "ghostty-no-blur", match = { class = "com.mitchellh.ghostty" }, no_blur = true })'
+    'hl.window_rule({ name = "kitty-no-blur", match = { class = "kitty" }, no_blur = true })'
+)
+
+# Comment a rule (turn blur ON) only if it is currently active.
+blur_on() {
+    local rule="$1"
+    if grep -Fxq -- "$rule" "$conf"; then
+        TB_RULE="$rule" TB_CMT="-- $rule" perl -0pi -e \
+            's/^\Q$ENV{TB_RULE}\E$/$ENV{TB_CMT}/m' "$conf"
+    fi
+}
+
+# Uncomment a rule (turn blur OFF) only if it is currently commented.
+blur_off() {
+    local rule="$1"
+    if grep -Fxq -- "-- $rule" "$conf"; then
+        TB_RULE="$rule" TB_CMT="-- $rule" perl -0pi -e \
+            's/^\Q$ENV{TB_CMT}\E$/$ENV{TB_RULE}/m' "$conf"
+    fi
+}
+
+# Decide the new state from the whole set, not one "primary" rule: if any
+# no_blur rule is still active we are (partly) transparent, so switch
+# everything to blurred. Otherwise everything is blurred, so go transparent.
+# Either way all rules end up in the SAME state, healing any desync.
+new_state="transparent"
+for rule in "${rules[@]}"; do
+    if grep -Fxq -- "$rule" "$conf"; then
+        new_state="blurred"
+        break
+    fi
+done
+
+for rule in "${rules[@]}"; do
+    if [[ "$new_state" == "blurred" ]]; then
+        blur_on "$rule"
+    else
+        blur_off "$rule"
+    fi
+done
+
+hyprctl reload >/dev/null 2>&1 || true
+
+printf 'terminal-blur: %s\n' "$new_state"

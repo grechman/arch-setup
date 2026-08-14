@@ -8,11 +8,48 @@ NAME="${1:?usage: theme-apply <theme-name>}"
 THEMES_DIR="$HOME/.config/themes"
 SRC="$THEMES_DIR/$NAME"
 ACTIVE="$THEMES_DIR/active"
+TMPDIR="${TMPDIR:-$HOME/.cache/tmp}"
+export TMPDIR
+mkdir -p "$TMPDIR"
 
 if [[ ! -d "$SRC" ]]; then
     command -v notify-send >/dev/null && notify-send "theme-apply" "unknown theme: $NAME"
     echo "theme-apply: unknown theme: $NAME" >&2
     exit 1
+fi
+
+BASE="dark"
+if [[ -f "$SRC/base" ]]; then
+    read -r BASE <"$SRC/base"
+    BASE="${BASE,,}"
+    [[ "$BASE" == "light" || "$BASE" == "dark" ]] || BASE="dark"
+fi
+CLAUDE_BASE="$BASE"
+[[ "$CLAUDE_BASE" == "dark" ]] && CLAUDE_BASE="dark-ansi"
+
+GTK_DARK="true"
+ICON_THEME="Papirus-Dark"
+ROFI_BG_ALPHA="0.35"
+ROFI_BG_ALT_ALPHA="0.0"
+GHOSTTY_OPACITY="0.91"
+GHOSTTY_BLUR="true"
+KITTY_TEXT="platform"
+if [[ "$BASE" == "light" ]]; then
+    GTK_DARK="false"
+    ICON_THEME="Papirus-Light"
+    ROFI_BG_ALPHA="0.96"
+    ROFI_BG_ALT_ALPHA="0.92"
+    GHOSTTY_OPACITY="1"
+    GHOSTTY_BLUR="false"
+    # kitty renders dark-on-light text thin; thicken it to match ghostty (light themes only)
+    KITTY_TEXT="1.7 30"
+fi
+
+# terminal background of this theme; used to make Claude Code's message strips
+# blend into the terminal background (see kitty transparent_background_colors below)
+KITTY_BG=""
+if [[ -f "$SRC/kitty-theme.conf" ]]; then
+    KITTY_BG="$(awk '/^background[[:space:]]/{print $2; exit}' "$SRC/kitty-theme.conf")"
 fi
 
 ln -snf "$NAME" "$ACTIVE"
@@ -45,6 +82,29 @@ write_if_changed() {
     rm -f "$tmp"
 }
 
+set_gtk_setting() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+
+    [[ -f "$file" ]] || return 0
+    if grep -qE "^${key}=" "$file"; then
+        sed -i -E "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        sed -i -E "/^\\[Settings\\]/a ${key}=${value}" "$file"
+    fi
+}
+
+for gtk_settings in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+    set_gtk_setting "$gtk_settings" "gtk-application-prefer-dark-theme" "$GTK_DARK"
+    set_gtk_setting "$gtk_settings" "gtk-icon-theme-name" "$ICON_THEME"
+done
+
+rofi_config="$HOME/.config/rofi/config.rasi"
+if [[ -f "$rofi_config" ]]; then
+    sed -i -E "s|icon-theme: \"[^\"]+\";|icon-theme: \"${ICON_THEME}\";|" "$rofi_config"
+fi
+
 if [[ -f "$SRC/waybar-colors.css" ]]; then
     bg="$(color bg)"
     bg_alt="$(color bg_alt)"
@@ -58,14 +118,16 @@ if [[ -f "$SRC/waybar-colors.css" ]]; then
     critical="$(color critical)"
     info="$(color info)"
     info_alt="$(color info_alt)"
+    mascot="$(color cpu_color)"
+    [[ -n "$mascot" ]] || mascot="$hover"
 
     rofi_bg="$(hex_rgb "$bg")"
     rofi_bg_alt="$(hex_rgb "$bg_alt")"
 
     write_if_changed "$HOME/.config/rofi/colors.rasi" <<EOF
 * {
-    bg:         rgba(${rofi_bg}, 0.35);
-    bg-alt:     rgba(${rofi_bg_alt}, 0.0);
+    bg:         rgba(${rofi_bg}, ${ROFI_BG_ALPHA});
+    bg-alt:     rgba(${rofi_bg_alt}, ${ROFI_BG_ALT_ALPHA});
     bg-sel:     #${accent};
     fg:         #${fg};
     fg-dim:     #${fg_alt};
@@ -222,9 +284,175 @@ fi
 if [[ -f "$SRC/ghostty-theme" ]]; then
     ghostty_theme="$(<"$SRC/ghostty-theme")"
     ghostty_conf="$HOME/.config/ghostty/config"
-    [[ -f "$ghostty_conf" ]] && \
+    if [[ -f "$ghostty_conf" ]]; then
         sed -i -E "s|^[[:space:]]*theme[[:space:]]*=.*|theme = ${ghostty_theme}|" "$ghostty_conf"
+        sed -i -E "s|^[[:space:]]*background-opacity[[:space:]]*=.*|background-opacity = ${GHOSTTY_OPACITY}|" "$ghostty_conf"
+        sed -i -E "s|^[[:space:]]*background-blur[[:space:]]*=.*|background-blur = ${GHOSTTY_BLUR}|" "$ghostty_conf"
+    fi
     pkill -SIGUSR2 -x ghostty 2>/dev/null || true
+fi
+
+# --- kitty ---
+if [[ -f "$SRC/kitty-theme.conf" ]]; then
+    kitty_current="$HOME/.config/kitty/themes/current.conf"
+    install -Dm644 "$SRC/kitty-theme.conf" "$kitty_current"
+    # opacity mirrors ghostty: light themes opaque, dark translucent.
+    # current.conf is included after background_opacity in kitty.conf, so this wins.
+    # (live changes need dynamic_background_opacity yes, set in kitty.conf.)
+    printf '\n# opacity (managed by theme-apply)\nbackground_opacity %s\n' "$GHOSTTY_OPACITY" >>"$kitty_current"
+    # text weight: thicken dark-on-light glyphs on light themes; dark themes use platform default
+    printf '# text weight (managed by theme-apply)\ntext_composition_strategy %s\n' "$KITTY_TEXT" >>"$kitty_current"
+    # cells explicitly painted with the background color (Claude Code's message
+    # strips) render as transparent as the default background, so they vanish.
+    # No @opacity -> inherits background_opacity above.
+    # disabled: listing the theme background here caused visible banding
+    # [[ -n "$KITTY_BG" ]] && printf 'transparent_background_colors %s\n' "$KITTY_BG" >>"$kitty_current"
+    pkill -SIGUSR1 kitty 2>/dev/null || true
+fi
+
+# --- Claude Code ---
+if [[ -f "$SRC/claude-code-theme.json" || -f "$SRC/waybar-colors.css" ]] && command -v jq >/dev/null; then
+    claude_theme_dir="$HOME/.claude/themes"
+    install -d "$claude_theme_dir"
+
+    claude_tmp="$(mktemp)"
+
+    if [[ -f "$SRC/claude-code-theme.json" ]]; then
+        cat "$SRC/claude-code-theme.json" >"$claude_tmp"
+    else
+        jq -n \
+            --arg name "$NAME" \
+            --arg base "$CLAUDE_BASE" \
+            --arg bg "#$bg" \
+            --arg bg_alt "#$bg_alt" \
+            --arg fg "#$fg" \
+            --arg fg_muted "#$fg_muted" \
+            --arg fg_alt "#$fg_alt" \
+            --arg accent "#$accent" \
+            --arg hover "#$hover" \
+            --arg ok "#$ok" \
+            --arg warn "#$warn" \
+            --arg critical "#$critical" \
+            --arg info "#$info" \
+            --arg info_alt "#$info_alt" \
+            --arg mascot "#$mascot" \
+            '{
+                name: $name,
+                base: $base,
+                overrides: {
+                    autoAccept: $accent,
+                    bashBorder: $critical,
+                    claude: $accent,
+                    claudeShimmer: $info_alt,
+                    claudeBlue_FOR_SYSTEM_SPINNER: $info_alt,
+                    claudeBlueShimmer_FOR_SYSTEM_SPINNER: $info,
+                    permission: $accent,
+                    permissionShimmer: $info,
+                    planMode: $info,
+                    ide: $info_alt,
+                    promptBorder: $fg_muted,
+                    promptBorderShimmer: $fg_alt,
+                    # "text" is the only key Claude Code uses for MY message text
+                    # (assistant prose is drawn with no color at all). Hand-written
+                    # themes set their own; generated ones get bright magenta,
+                    # the slot the Claude UI barely touches.
+                    text: "ansi:magentaBright",
+                    inverseText: $fg,
+                    inactive: $fg_alt,
+                    inactiveShimmer: $fg,
+                    subtle: $fg_muted,
+                    suggestion: $accent,
+                    remember: $info,
+                    background: $fg,
+                    success: $ok,
+                    error: $critical,
+                    warning: $warn,
+                    warningShimmer: $warn,
+                    merged: $ok,
+                    fastMode: $hover,
+                    fastModeShimmer: $warn,
+                    diffAdded: $bg_alt,
+                    diffRemoved: $bg_alt,
+                    diffAddedDimmed: $bg,
+                    diffRemovedDimmed: $bg,
+                    diffAddedWord: $ok,
+                    diffRemovedWord: $critical,
+                    diffAddedWordDimmed: $ok,
+                    diffRemovedWordDimmed: $critical,
+                    red_FOR_SUBAGENTS_ONLY: $critical,
+                    blue_FOR_SUBAGENTS_ONLY: $info_alt,
+                    green_FOR_SUBAGENTS_ONLY: $ok,
+                    yellow_FOR_SUBAGENTS_ONLY: $warn,
+                    purple_FOR_SUBAGENTS_ONLY: $accent,
+                    orange_FOR_SUBAGENTS_ONLY: $hover,
+                    pink_FOR_SUBAGENTS_ONLY: $hover,
+                    cyan_FOR_SUBAGENTS_ONLY: $info,
+                    professionalBlue: $info_alt,
+                    rainbow_red: $critical,
+                    rainbow_orange: $hover,
+                    rainbow_yellow: $warn,
+                    rainbow_green: $ok,
+                    rainbow_blue: $info_alt,
+                    rainbow_indigo: $accent,
+                    rainbow_violet: $hover,
+                    rainbow_red_shimmer: $critical,
+                    rainbow_orange_shimmer: $hover,
+                    rainbow_yellow_shimmer: $warn,
+                    rainbow_green_shimmer: $ok,
+                    rainbow_blue_shimmer: $info,
+                    rainbow_indigo_shimmer: $accent,
+                    rainbow_violet_shimmer: $fg,
+                    clawd_body: $mascot,
+                    clawd_background: $bg,
+                    userMessageBackground: $bg_alt,
+                    userMessageBackgroundHover: $bg_alt,
+                    messageActionsBackground: $bg_alt,
+                    bashMessageBackgroundColor: $bg_alt,
+                    memoryBackgroundColor: $bg_alt,
+                    selectionBg: $accent,
+                    rate_limit_fill: $accent,
+                    rate_limit_empty: $bg_alt,
+                    briefLabelYou: $info,
+                    briefLabelClaude: $accent
+                }
+            }' >"$claude_tmp"
+    fi
+
+    # Dark-theme invariants, generated or hand-written:
+    #  - message strips (user prompt, bash, memory) take the terminal background
+    #    color, so they read as no background at all. Dark only: light themes run
+    #    opaque, where those strips are a legibility band worth keeping.
+    #  - "inverseText" is the text drawn on colored chips (session color, badges).
+    #    On dark themes it must be dark or it renders white-on-salmon; on light
+    #    themes the chips are saturated, so it has to stay light there.
+    claude_msg_bg="${KITTY_BG:-}"
+    if [[ -n "$claude_msg_bg" && "$BASE" == "dark" ]] && jq --arg msgbg "$claude_msg_bg" '
+            .overrides += {
+                userMessageBackground: $msgbg,
+                userMessageBackgroundHover: $msgbg,
+                messageActionsBackground: $msgbg,
+                bashMessageBackgroundColor: $msgbg,
+                memoryBackgroundColor: $msgbg,
+                composerSidebarBackground: $msgbg,
+                inverseText: $msgbg
+            }' "$claude_tmp" >"$claude_tmp.msgbg"; then
+        mv "$claude_tmp.msgbg" "$claude_tmp"
+    fi
+    rm -f "$claude_tmp.msgbg"
+
+    write_if_changed "$claude_theme_dir/$NAME.json" <"$claude_tmp"
+    rm -f "$claude_tmp"
+
+    claude_settings="$HOME/.claude/settings.json"
+    if [[ -f "$claude_settings" ]]; then
+        tmp="$(mktemp)"
+        if jq --arg theme "custom:$NAME" '.theme = $theme' "$claude_settings" >"$tmp"; then
+            if ! cmp -s "$tmp" "$claude_settings"; then
+                install -m 600 "$tmp" "$claude_settings"
+            fi
+        fi
+        rm -f "$tmp"
+    fi
 fi
 
 # --- waybar ---

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Restore the pre-Lua Hyprland config path.
+
+set -euo pipefail
+
+HYPR_DIR="$HOME/.config/hypr"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+SAFETY="$HOME/backups/hyprland-current-before-legacy-restore-$STAMP"
+SOURCE_BACKUP="${1:-}"
+
+mkdir -p "$SAFETY"
+
+if [[ -n "$SOURCE_BACKUP" ]]; then
+    if [[ ! -d "$SOURCE_BACKUP/hypr" ]]; then
+        echo "hypr-restore-legacy: expected backup dir containing hypr/: $SOURCE_BACKUP" >&2
+        exit 1
+    fi
+
+    if [[ -d "$HYPR_DIR" ]]; then
+        mv "$HYPR_DIR" "$SAFETY/hypr-current"
+    fi
+    cp -a "$SOURCE_BACKUP/hypr" "$HYPR_DIR"
+else
+    cp -a "$HYPR_DIR" "$SAFETY/hypr-current"
+
+    if [[ -f "$HYPR_DIR/hyprland.lua" ]]; then
+        mv "$HYPR_DIR/hyprland.lua" "$HYPR_DIR/hyprland.lua.disabled-$STAMP"
+    fi
+fi
+
+hyprctl reload >/dev/null 2>&1 || true
+
+cat <<EOF
+Legacy Hyprland config restored.
+Current config snapshot: $SAFETY
+
+If this session was started from hyprland.lua, restart Hyprland.
+Hyprland chooses between hyprland.lua and hyprland.conf only at startup.
+EOF

@@ -1,0 +1,15 @@
+/* bright sun - solarized-leaning high-contrast light */
+@define-color bg        #fdf6e3;
+@define-color bg_alt    #eee8d5;
+@define-color fg        #111111;
+@define-color fg_muted  #6b6458;
+@define-color fg_alt    #3b352d;
+@define-color accent    #0b67b2;
+@define-color hover     #cb4b16;
+@define-color ok        #6b8e00;
+@define-color warn      #8a6a00;
+@define-color critical  #b0302f;
+@define-color info      #2a8a9e;
+@define-color info_alt  #6c71c4;
+@define-color cpu_color #cb4b16;
+@define-color mem_color #6c71c4;

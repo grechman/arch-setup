@@ -1,6 +1,6 @@
 [user]
-	name = CHANGEME
-	email = CHANGEME@example.com
+	name = grechman
+	email = maxgrechkov@yandex.ru
 [credential]
 	helper = libsecret
 [init]

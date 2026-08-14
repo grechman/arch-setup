@@ -1,14 +1,14 @@
 {
     "position": "top",
-    "height": 35,
-    "modules-left": ["ext/workspaces"],
+    "height": 27,
+    "modules-left": ["hyprland/workspaces"],
     "modules-center": ["clock"],
-    "modules-right": ["hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
+    "modules-right": ["pulseaudio", "hyprland/language", "network", "battery", "custom/notif"],
 
-    "ext/workspaces": {
+    "hyprland/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
-        "sort-by-name": true,
+        "persistent-workspaces": { "*": 5 },
         "format-icons": {
             "active": "●",
             "default": "•"
@@ -52,8 +52,7 @@
         "format-ethernet": "󰈀",
         "format-disconnected": "󰤭",
         "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
-        "tooltip": false,
-        "on-click": "~/.config/waybar/wifi-menu.sh"
+        "tooltip": false
     },
 
     "hyprland/language": {

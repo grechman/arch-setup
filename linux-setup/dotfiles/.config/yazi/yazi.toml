@@ -3,3 +3,24 @@ show_hidden = true
 
 [preview]
 image_protocol = "kitty"
+
+[opener]
+edit = [
+  { run = "nvim %s", block = true, desc = "Edit with nvim", for = "linux" },
+]
+pdf = [
+  { run = "helium-browser --user-data-dir=$HOME/.cache/helium-pdf-reader --no-first-run --app=file://%s", orphan = true, desc = "Open PDF in Helium Reader", for = "linux" },
+]
+html = [
+  { run = "helium-browser --user-data-dir=$HOME/.cache/helium-html-reader --no-first-run --app=file://%s", orphan = true, desc = "Open HTML in Helium Reader", for = "linux" },
+]
+
+[open]
+prepend_rules = [
+  { mime = "application/pdf", use = "pdf" },
+  { url = "*.pdf", use = "pdf" },
+  { mime = "text/html", use = "html" },
+  { mime = "application/xhtml+xml", use = "html" },
+  { url = "*.html", use = "html" },
+  { url = "*.htm", use = "html" },
+]

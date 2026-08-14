@@ -1,4 +1,5 @@
 [Default Applications]
+application/pdf=helium-pdf-reader.desktop
 inode/directory=nemo.desktop
 application/x-gnome-saved-search=nemo.desktop
 x-scheme-handler/file=nemo.desktop

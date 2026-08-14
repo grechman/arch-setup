@@ -1,9 +1,9 @@
 font-family = JetBrainsMono Nerd Font
-font-size = 14
+font-size = 16
 command = /usr/bin/zsh
 background-opacity = 0.91
-background-blur=true
-# theme is managed by ~/.local/bin/theme-apply (rose-pine | gruvbox)
+background-blur = true
+# theme is managed by ~/.local/bin/theme-apply
 theme = Kanagawa Dragon
 
 # Copy/paste (latin + russian layout)
