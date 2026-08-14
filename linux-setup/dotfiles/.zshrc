@@ -295,7 +295,7 @@ yayi() {
 # zoxide: smarter cd. `cd` is replaced by zoxide; `cdi` gives interactive pick.
 # Must be initialized last so its prefix-cd and chpwd hooks wrap everything.
 command -v zoxide >/dev/null && eval "$(zoxide init zsh --cmd cd)"
-# KIRO_API_KEY set locally, not in repo
+[ -f ~/.zshrc.private ] && source ~/.zshrc.private
 
 # Launch Eador: Genesis fullscreen (gamescope upscales the native 1024x768 to the
 # monitor; runs in a subshell so it doesn't move the shell, output silenced).
@@ -304,6 +304,3 @@ eador() {
         gamescope -w 1024 -h 768 -W 1920 -H 1080 -f -- wine Eador.exe ) >/dev/null 2>&1
 }
 
-# windows dev server (tailscale)
-alias windows='ssh -t maxgrechkov@100.123.98.112 "wsl -d Ubuntu --cd ~"'
-alias winps='ssh -t maxgrechkov@100.123.98.112 powershell'
