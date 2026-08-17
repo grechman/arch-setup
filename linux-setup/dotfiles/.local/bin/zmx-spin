@@ -11,25 +11,28 @@
 # Busy detection: sum of write-bytes (/proc/<pid>/io wchar) of every claude
 # process descended from the session's shell. Measured on this machine:
 # idle claude (cursor blink, agents UI) ~250 B/s, working claude (its own
-# spinner animation alone) >=1400 B/s. Threshold 150 B per 0.25s tick, with
-# 2-ticks-to-enter / 4-ticks-to-leave hysteresis so blink bursts don't spin.
+# spinner animation alone) >=1400 B/s. Threshold: 600 B/s.
+#
+# Compute diet: /proc reads are pure zsh (no forks). Process discovery,
+# zmx ls and kitten @ ls run at most once per second; animation frames
+# (kitten set-tab-title, one per busy tab) at 4 fps. With nothing busy the
+# loop idles at 1 Hz, with no kitty sockets at all it just sleeps.
 ZMX="$HOME/.local/bin/zmx"
 [[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
 KITTEN=/usr/bin/kitten
 TITLES=$HOME/.local/state/zmx/titles
-TICK=0.25
-THRESH=150
-
+RATE=600              # busy threshold, output bytes per second
 frames=("✳" "✢" "✶" "✻")
-typeset -A prevw state above below lasttitle
-tick=0
+
+typeset -A shellof sessof prevw state above below lasttitle
 rows=""
+tick=0
+anybusy=0
+lastsleep=1
 
-while true; do
-    (( tick++ ))
-
-    # session name -> shell pid
-    typeset -A shellof=()
+refresh_heavy() {
+    # session name <- shell pid
+    shellof=()
     while read -r n p; do
         [[ -n "$n" ]] && shellof[$p]=$n
     done <<< "$($ZMX ls 2>/dev/null | awk '
@@ -43,55 +46,77 @@ while true; do
             if (n != "" && p != "") print n, p
         }')"
 
-    # attribute every claude process to a session by walking its ancestors,
-    # so sub-claudes (agents dashboard children) count toward the same tab
-    typeset -A wsum=()
+    # claude pid -> session, by walking ancestors (sub-claudes of the agents
+    # dashboard land in the same tab). Pure /proc, only pgrep forks.
+    sessof=()
+    local cpid a s
     for cpid in $(pgrep -x claude 2>/dev/null); do
         a=$cpid
         for _ in 1 2 3 4 5; do
-            stat=$(</proc/$a/stat) 2>/dev/null || break
-            a=${${(z)${stat##*) }}[2]}   # ppid: 2nd field after the (comm)
+            s=$(</proc/$a/stat) 2>/dev/null || break
+            a=${${(z)${s##*) }}[2]}   # ppid: 2nd field after the (comm)
             [[ -z "$a" || "$a" == 1 ]] && break
-            if [[ -n "${shellof[$a]}" ]]; then
-                w=$(awk '/^wchar/{print $2}' /proc/$cpid/io 2>/dev/null)
-                (( wsum[${shellof[$a]}] += ${w:-0} ))
-                break
-            fi
+            if [[ -n "${shellof[$a]}" ]]; then sessof[$cpid]=${shellof[$a]}; break; fi
         done
     done
 
+    # kitty tabs backed by zmx sessions: sock, window id, focus, session
+    rows=""
+    local sock
+    for sock in /tmp/kitty-sock-*(N=); do
+        rows+="$($KITTEN @ --to "unix:$sock" ls 2>/dev/null | jq -r --arg s "$sock" '
+            .[] | .is_focused as $of | .tabs[] | .is_focused as $tf
+            | .windows[] | . as $w
+            | (($w.foreground_processes // [])[0].cmdline // []) as $c
+            | select(($c[0] // "" | endswith("zmx")) and (($c[1] // "") == "attach"))
+            | [$s, $w.id, $of, $tf, ($c[2] // "")] | @tsv')"$'\n'
+    done
+}
+
+while true; do
+    (( tick++ ))
+
+    if [[ -z "$(echo /tmp/kitty-sock-*(N=))" ]]; then
+        sleep 2; continue
+    fi
+
+    # heavy discovery: 1 Hz while animating, every idle cycle otherwise
+    if (( anybusy == 0 )) || (( tick % 4 == 1 )); then
+        refresh_heavy
+    fi
+
+    # accumulate output bytes per session (pure zsh, fork-free)
+    typeset -A wsum=()
+    for cpid in ${(k)sessof}; do
+        io=$(</proc/$cpid/io) 2>/dev/null || continue
+        w=${${io#*wchar: }%%$'\n'*}
+        (( wsum[${sessof[$cpid]}] += ${w:-0} ))
+    done
+
+    # busy threshold scaled to how long we actually slept
+    step=$(( RATE * lastsleep ))
+    anybusy=0
     for name in ${(v)shellof}; do
         w=${wsum[$name]:-}
         if [[ -z "$w" ]]; then
-            state[$name]=none
-            unset "prevw[$name]"
-            continue
+            state[$name]=none; unset "prevw[$name]"; continue
         fi
         d=$(( w - ${prevw[$name]:-$w} ))
         prevw[$name]=$w
-        if (( d > THRESH )); then
+        if (( d > step )); then
             (( above[$name]++ )); below[$name]=0
-            (( above[$name] >= 2 )) && state[$name]=busy
+            # a strong burst flips immediately, a weak one needs two ticks
+            if (( d > step * 3 || above[$name] >= 2 )); then
+                state[$name]=busy
+            fi
         else
             (( below[$name]++ )); above[$name]=0
             if [[ "${state[$name]}" == busy ]] && (( below[$name] >= 4 )); then
                 state[$name]=done
             fi
         fi
+        [[ "${state[$name]}" == busy ]] && anybusy=1
     done
-
-    # refresh the tab layout every other tick; title writes happen every tick
-    if [[ -z "$rows" ]] || (( tick % 2 == 0 )); then
-        rows=""
-        for sock in /tmp/kitty-sock-*(N=); do
-            rows+="$($KITTEN @ --to "unix:$sock" ls 2>/dev/null | jq -r --arg s "$sock" '
-                .[] | .is_focused as $of | .tabs[] | .is_focused as $tf
-                | .windows[] | . as $w
-                | (($w.foreground_processes // [])[0].cmdline // []) as $c
-                | select(($c[0] // "" | endswith("zmx")) and (($c[1] // "") == "attach"))
-                | [$s, $w.id, $of, $tf, ($c[2] // "")] | @tsv')"$'\n'
-        done
-    fi
 
     while IFS=$'\t' read -r sock wid of tf name; do
         [[ -z "$name" ]] && continue
@@ -100,7 +125,7 @@ while true; do
         if [[ "$s" == done && "$of" == true && "$tf" == true ]]; then
             state[$name]=seen; s=seen
         fi
-        title=$(cat "$TITLES/$name" 2>/dev/null)
+        title=$(<"$TITLES/$name") 2>/dev/null
         title=${title:-$name}
         case $s in
             busy) t="${frames[$(( tick % 4 + 1 ))]} $title" ;;
@@ -114,5 +139,5 @@ while true; do
         fi
     done <<< "$rows"
 
-    sleep $TICK
+    if (( anybusy )); then lastsleep=0.25; sleep 0.25; else lastsleep=1; sleep 1; fi
 done
