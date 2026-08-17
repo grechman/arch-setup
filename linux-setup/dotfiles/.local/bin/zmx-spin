@@ -32,9 +32,10 @@ import subprocess
 import sys
 import time
 
-# claude-style pulse: grow from the dot to the heavy asterisk and back
+# claude-style pulse: grow from the dot to the heavy asterisk and back;
+# the endpoints (· and ✽) hold for two ticks, the rest for one
 _SEQ = ["·", "✢", "✳", "✶", "✻", "✽"]
-FRAMES = _SEQ + _SEQ[-2:0:-1]
+FRAMES = ["·"] + _SEQ + ["✽"] + _SEQ[-2:0:-1]
 RATE = 600.0        # bytes/sec of claude output that counts as working
 BURST = 3.0         # this many times RATE flips to busy instantly
 BUSY_SLEEP = 0.25
