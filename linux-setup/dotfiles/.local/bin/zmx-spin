@@ -32,7 +32,9 @@ import subprocess
 import sys
 import time
 
-FRAMES = ["✳", "✢", "✶", "✻"]
+# claude-style pulse: grow from the dot to the heavy asterisk and back
+_SEQ = ["·", "✢", "✳", "✶", "✻", "✽"]
+FRAMES = _SEQ + _SEQ[-2:0:-1]
 RATE = 600.0        # bytes/sec of claude output that counts as working
 BURST = 3.0         # this many times RATE flips to busy instantly
 BUSY_SLEEP = 0.25
@@ -216,7 +218,7 @@ def main():
                 state[sess] = st = "seen"
             title = stored_title(sess)
             if st == "busy":
-                t = f"{FRAMES[tick % 4]} {title}"
+                t = f"{FRAMES[tick % len(FRAMES)]} {title}"
             elif st == "done":
                 t = f"⦿ {title}"
             else:
