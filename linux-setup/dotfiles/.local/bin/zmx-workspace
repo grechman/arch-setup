@@ -1,0 +1,23 @@
+#!/bin/zsh
+# zmx-workspace: open the kitty workspace window - one tab per live zmx
+# session, ordered by creation time. Invoked by the `zmx main` wrapper.
+# Tab title = session name, unless a sidecar title exists
+# (~/.local/state/zmx/titles/<session>, written by zmx-rename).
+ZMX="$HOME/.local/bin/zmx"
+[[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
+sess="${XDG_RUNTIME_DIR:-/tmp}/zmx-main.session"
+: > "$sess"
+
+$ZMX ls 2>/dev/null | grep -v 'ended=' |
+    sed -n 's/^ *name=\([^\t]*\).*created=\([0-9]*\).*/\2 \1/p' | sort -n |
+    while read -r _ name; do
+        title=$(cat ~/.local/state/zmx/titles/"$name" 2>/dev/null)
+        printf 'new_tab %s\nlaunch %s %s\n\n' "${title:-$name}" "$HOME/.local/bin/zmx-tab" "$name" >> "$sess"
+    done
+
+# nothing alive: open one fresh auto-named tab
+if [[ ! -s "$sess" ]]; then
+    printf 'new_tab main\nlaunch %s\n' "$HOME/.local/bin/zmx-tab" > "$sess"
+fi
+
+exec env -u ZMX_SESSION kitty --session "$sess" --detach

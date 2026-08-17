@@ -1,0 +1,18 @@
+#!/bin/zsh
+# zmx-tab [name]: attach this terminal to a zmx session, creating it if
+# needed. With no name, picks the first free tN. Bound to alt+n in kitty.
+ZMX="$HOME/.local/bin/zmx"
+[[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
+name="$1"
+if [[ -z "$name" ]]; then
+    existing=$($ZMX ls --short 2>/dev/null)
+    i=1
+    while print -r -- "$existing" | grep -qx "t$i"; do (( i++ )); done
+    name="t$i"
+    # fresh auto-named session: drop any stale title left by a dead t$i
+    rm -f ~/.local/state/zmx/titles/"$name"
+fi
+# scrub ZMX_SESSION: if this kitty was itself launched from inside a zmx
+# session, an inherited ZMX_SESSION turns attach into "switch", which can
+# kill the current session (this took out a running claude on 2026-08-17)
+exec env -u ZMX_SESSION $ZMX attach "$name"

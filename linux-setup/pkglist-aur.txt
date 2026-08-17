@@ -16,3 +16,4 @@ where-is-my-sddm-theme-git
 yandex-music
 yay
 zen-twilight-bin
+zmx-bin

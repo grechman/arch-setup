@@ -1,0 +1,30 @@
+#!/bin/zsh
+# zmx-rename: runs as a kitty overlay (alt+r). Prompts for a name, sets the
+# kitty tab title now AND stores it in a sidecar file, so the
+# name survives closing the tab / window (zmx-open and zmx main read it).
+ZMX="$HOME/.local/bin/zmx"
+[[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
+KITTEN=/usr/bin/kitten
+
+read "name?rename tab: "
+[[ -z "$name" ]] && exit 0
+
+$KITTEN @ set-tab-title "$name"
+
+# the tab under this overlay runs `zmx attach <session>`; fish it out of ls
+sess=$($KITTEN @ ls | jq -r '
+    .[] | select(.is_active) | .tabs[] | select(.is_active) | .windows[]
+    | .foreground_processes[]?.cmdline
+    | select((.[0] // "" | endswith("zmx")) and ((.[1] // "") == "attach"))
+    | .[2] // empty' | head -n1)
+
+# store the title in a sidecar file: zmx labels only allow [a-zA-Z0-9-_.],
+# so spaces and cyrillic would be rejected there
+if [[ -n "$sess" ]]; then
+    mkdir -p ~/.local/state/zmx/titles
+    print -r -- "$name" > ~/.local/state/zmx/titles/"$sess"
+else
+    print -n "renamed, but this tab has no zmx session behind it (scratch shell) - "
+    print -n "the name dies with the tab. use alt+n tabs for persistent work. [any key]"
+    read -k1 -s
+fi

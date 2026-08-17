@@ -7,6 +7,7 @@ My Arch Linux + Hyprland dotfiles.
 - **Hyprland** window manager + hyprlock + hyprpaper
 - **Waybar** with custom notification module
 - **Ghostty** terminal
+- **kitty + zmx** persistent-tab workflow (tmux replacement): alt+n/o/r/1-9 binds, session-restore scripts in `.local/bin/zmx-*`
 - **Theme switching** for Hyprland, Ghostty, Waybar, Rofi, GTK, KDE/Qt, and tmux
 - **Neovim** (lazy.nvim)
 - **Rofi** launcher

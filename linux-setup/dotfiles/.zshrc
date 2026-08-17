@@ -10,6 +10,9 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="robbyrussell"
 
+# tab names come from kitty/zmx, not the shell; keep shell titles static
+DISABLE_AUTO_TITLE="true"
+
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
 # a theme from this variable instead of looking in $ZSH/themes/
@@ -166,6 +169,28 @@ newtab() {
         tmux attach -t main
     else
         tmux new-session -s main -n "$name"
+    fi
+}
+
+# static window title: scratch kitty tabs show "terminal" instead of
+# user@host:path (zmx tabs have pinned titles, so this only shows on scratch)
+_static_title() { print -n '\e]2;terminal\a' }
+precmd_functions+=(_static_title)
+
+# zmx workspace: `zmx main` opens a kitty window with one tab per live zmx
+# session (rebuilt dynamically by ~/.local/bin/zmx-workspace).
+# Anything else falls through to the real zmx binary.
+zmx() {
+    if [[ "$1" == main && $# -eq 1 ]]; then
+        "$HOME/.local/bin/zmx-workspace"
+    elif [[ -n "$ZMX_SESSION" && ( "$1" == a || "$1" == attach ) ]]; then
+        # attach from inside a session = zmx "switch": it can KILL the
+        # current session (took out a running claude on 2026-08-17). Refuse.
+        print -u2 "you are inside zmx session '$ZMX_SESSION' - attaching from here would kill it."
+        print -u2 "open the session as a tab instead: alt+o (all detached) or alt+n (new)."
+        return 1
+    else
+        command zmx "$@"
     fi
 }
 
