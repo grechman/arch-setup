@@ -1,143 +1,242 @@
-#!/bin/zsh
-# zmx-spin: watcher that animates kitty tab titles for zmx sessions where
-# claude is working (claude-style spinner frames), and marks finished ones
-# with "⦿ " - rendered as a red ✳ by the kitty tab template - until the tab
-# is actually looked at. Runs as a systemd user service.
-#
-# Why this exists: zmx parses and drops the inner shell's title/bell escapes,
-# so claude's native animated title can never reach the kitty tab bar from
-# inside a session. The only signal that crosses zmx is the output stream.
-#
-# Busy detection: sum of write-bytes (/proc/<pid>/io wchar) of every claude
-# process descended from the session's shell. Measured on this machine:
-# idle claude (cursor blink, agents UI) ~250 B/s, working claude (its own
-# spinner animation alone) >=1400 B/s. Threshold: 600 B/s.
-#
-# Compute diet: /proc reads are pure zsh (no forks). Process discovery,
-# zmx ls and kitten @ ls run at most once per second; animation frames
-# (kitten set-tab-title, one per busy tab) at 4 fps. With nothing busy the
-# loop idles at 1 Hz, with no kitty sockets at all it just sleeps.
-ZMX="$HOME/.local/bin/zmx"
-[[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
-KITTEN=/usr/bin/kitten
-TITLES=$HOME/.local/state/zmx/titles
-RATE=600              # busy threshold, output bytes per second
-frames=("✳" "✢" "✶" "✻")
+#!/usr/bin/env python3
+"""zmx-spin: animate kitty tab titles for zmx sessions where claude is
+working (claude-style spinner frames), and mark finished ones with "⦿ " -
+rendered as a red ✳ by the kitty tab template - until the tab is actually
+looked at. Runs as a systemd user service.
 
-typeset -A shellof sessof prevw state above below lasttitle
-rows=""
-tick=0
-anybusy=0
-lastsleep=1
+Why this exists: zmx parses and drops the inner shell's title/bell escapes,
+so claude's native animated title can never reach the kitty tab bar from
+inside a session. The only signal that crosses zmx is the output stream.
 
-refresh_heavy() {
-    # session name <- shell pid
-    shellof=()
-    while read -r n p; do
-        [[ -n "$n" ]] && shellof[$p]=$n
-    done <<< "$($ZMX ls 2>/dev/null | awk '
-        !/ended=/ {
-            n = ""; p = ""
-            for (i = 1; i <= NF; i++) {
-                split($i, kv, "=")
-                if (kv[1] == "name") n = kv[2]
-                if (kv[1] == "pid")  p = kv[2]
-            }
-            if (n != "" && p != "") print n, p
-        }')"
+Busy detection: sum of write-bytes (/proc/<pid>/io wchar) of every claude
+process belonging to a session (attributed via the ZMX_SESSION env var each
+claude inherits from the session shell - sub-claudes count too). Measured on
+this machine: idle claude (cursor blink, agents UI) ~250 B/s, working claude
+(its own spinner animation alone) >=1400 B/s. Threshold 600 B/s with
+2-ticks-to-enter / 4-ticks-to-leave hysteresis; a >1800 B/s burst flips
+instantly.
 
-    # claude pid -> session, by walking ancestors (sub-claudes of the agents
-    # dashboard land in the same tab). Pure /proc, only pgrep forks.
-    sessof=()
-    local cpid a s
-    for cpid in $(pgrep -x claude 2>/dev/null); do
-        a=$cpid
-        for _ in 1 2 3 4 5; do
-            s=$(</proc/$a/stat) 2>/dev/null || break
-            a=${${(z)${s##*) }}[2]}   # ppid: 2nd field after the (comm)
-            [[ -z "$a" || "$a" == 1 ]] && break
-            if [[ -n "${shellof[$a]}" ]]; then sessof[$cpid]=${shellof[$a]}; break; fi
-        done
-    done
+This is a single persistent process speaking kitty's remote-control protocol
+over its unix socket directly (frame format and envelope mirror
+kitty/remote_control.py): no subprocess spawns at all in the steady state,
+unlike the earlier shell version which burned ~13% of a core on kitten/jq
+forks. Frames run at 4 fps while something is busy; idle, the loop drops to
+1 Hz; with no kitty sockets it just sleeps.
+"""
+import glob
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
 
-    # kitty tabs backed by zmx sessions: sock, window id, focus, session
-    rows=""
-    local sock
-    for sock in /tmp/kitty-sock-*(N=); do
-        rows+="$($KITTEN @ --to "unix:$sock" ls 2>/dev/null | jq -r --arg s "$sock" '
-            .[] | .is_focused as $of | .tabs[] | .is_focused as $tf
-            | .windows[] | . as $w
-            | (($w.foreground_processes // [])[0].cmdline // []) as $c
-            | select(($c[0] // "" | endswith("zmx")) and (($c[1] // "") == "attach"))
-            | [$s, $w.id, $of, $tf, ($c[2] // "")] | @tsv')"$'\n'
-    done
-}
+FRAMES = ["✳", "✢", "✶", "✻"]
+RATE = 600.0        # bytes/sec of claude output that counts as working
+BURST = 3.0         # this many times RATE flips to busy instantly
+BUSY_SLEEP = 0.25
+IDLE_SLEEP = 1.0
+TITLES = os.path.expanduser("~/.local/state/zmx/titles")
+SOCK_GLOB = "/tmp/kitty-sock-*"
 
-while true; do
-    (( tick++ ))
 
-    if [[ -z "$(echo /tmp/kitty-sock-*(N=))" ]]; then
-        sleep 2; continue
-    fi
+def kitty_version():
+    try:
+        out = subprocess.run(["kitty", "--version"],
+                             capture_output=True, text=True).stdout
+        m = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+        if m:
+            return [int(x) for x in m.groups()]
+    except OSError:
+        pass
+    return [0, 30, 0]
 
-    # heavy discovery: 1 Hz while animating, every idle cycle otherwise
-    if (( anybusy == 0 )) || (( tick % 4 == 1 )); then
-        refresh_heavy
-    fi
 
-    # accumulate output bytes per session (pure zsh, fork-free)
-    typeset -A wsum=()
-    for cpid in ${(k)sessof}; do
-        io=$(</proc/$cpid/io) 2>/dev/null || continue
-        w=${${io#*wchar: }%%$'\n'*}
-        (( wsum[${sessof[$cpid]}] += ${w:-0} ))
-    done
+VERSION = kitty_version()
+RESP_RE = re.compile(rb"\x1bP@kitty-cmd([^\x1b]+)\x1b\\")
 
-    # busy threshold scaled to how long we actually slept
-    step=$(( RATE * lastsleep ))
-    anybusy=0
-    for name in ${(v)shellof}; do
-        w=${wsum[$name]:-}
-        if [[ -z "$w" ]]; then
-            state[$name]=none; unset "prevw[$name]"; continue
-        fi
-        d=$(( w - ${prevw[$name]:-$w} ))
-        prevw[$name]=$w
-        if (( d > step )); then
-            (( above[$name]++ )); below[$name]=0
-            # a strong burst flips immediately, a weak one needs two ticks
-            if (( d > step * 3 || above[$name] >= 2 )); then
-                state[$name]=busy
-            fi
-        else
-            (( below[$name]++ )); above[$name]=0
-            if [[ "${state[$name]}" == busy ]] && (( below[$name] >= 4 )); then
-                state[$name]=done
-            fi
-        fi
-        [[ "${state[$name]}" == busy ]] && anybusy=1
-    done
 
-    while IFS=$'\t' read -r sock wid of tf name; do
-        [[ -z "$name" ]] && continue
-        s=${state[$name]:-none}
-        # marker is cleared only when the tab is genuinely on screen
-        if [[ "$s" == done && "$of" == true && "$tf" == true ]]; then
-            state[$name]=seen; s=seen
-        fi
-        title=$(<"$TITLES/$name") 2>/dev/null
-        title=${title:-$name}
-        case $s in
-            busy) t="${frames[$(( tick % 4 + 1 ))]} $title" ;;
-            done) t="⦿ $title" ;;
-            *)    t="$title" ;;
-        esac
-        key="$sock:$wid"
-        if [[ "${lasttitle[$key]}" != "$t" ]]; then
-            $KITTEN @ --to "unix:$sock" set-tab-title --match "id:$wid" "$t" 2>/dev/null
-            lasttitle[$key]=$t
-        fi
-    done <<< "$rows"
+def rc(sock_path, cmd, payload, want_response):
+    """One kitty remote-control command over the unix socket."""
+    envelope = {"cmd": cmd, "version": VERSION,
+                "no_response": not want_response, "payload": payload}
+    data = b"\x1bP" + ("@kitty-cmd" + json.dumps(envelope)).encode("ascii") + b"\x1b\\"
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(2.0)
+    try:
+        s.connect(sock_path)
+        s.sendall(data)
+        s.shutdown(socket.SHUT_WR)
+        if not want_response:
+            return None
+        buf = b""
+        while True:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+        m = RESP_RE.search(buf)
+        if m is None:
+            return None
+        resp = json.loads(m.group(1))
+        if not resp.get("ok"):
+            return None
+        d = resp.get("data")
+        return json.loads(d) if isinstance(d, str) else d
+    finally:
+        s.close()
 
-    if (( anybusy )); then lastsleep=0.25; sleep 0.25; else lastsleep=1; sleep 1; fi
-done
+
+def discover_claudes():
+    """{pid: session} for every claude process with ZMX_SESSION. Full /proc
+    scan - runs at the heavy (1 Hz) cadence only."""
+    found = {}
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/comm") as f:
+                if f.read().strip() != "claude":
+                    continue
+            with open(f"/proc/{pid}/environ", "rb") as f:
+                for var in f.read().split(b"\0"):
+                    if var.startswith(b"ZMX_SESSION="):
+                        found[pid] = var[12:].decode("utf-8", "replace")
+                        break
+        except (OSError, ValueError):
+            continue
+    return found
+
+
+def sample_output(claudes):
+    """{session: summed wchar} for the cached claude pids - cheap, every tick."""
+    sums = {}
+    for pid, sess in list(claudes.items()):
+        try:
+            with open(f"/proc/{pid}/io") as f:
+                for line in f:
+                    if line.startswith("wchar:"):
+                        sums[sess] = sums.get(sess, 0) + int(line.split()[1])
+                        break
+        except (OSError, ValueError):
+            del claudes[pid]
+    return sums
+
+
+def kitty_tabs():
+    """[(sock, window_id, tab_on_screen, session)] for zmx-backed tabs."""
+    rows = []
+    for sp in glob.glob(SOCK_GLOB):
+        try:
+            data = rc(sp, "ls", {}, True)
+        except ConnectionRefusedError:
+            # socket file left behind by a dead kitty
+            try:
+                os.unlink(sp)
+            except OSError:
+                pass
+            continue
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, list):
+            continue
+        for osw in data:
+            of = bool(osw.get("is_focused"))
+            for tab in osw.get("tabs", []):
+                tf = bool(tab.get("is_focused"))
+                for w in tab.get("windows", []):
+                    fps = w.get("foreground_processes") or []
+                    if not fps:
+                        continue
+                    c = fps[0].get("cmdline") or []
+                    if len(c) >= 3 and c[0].endswith("zmx") and c[1] == "attach":
+                        rows.append((sp, w.get("id"), of and tf, c[2]))
+    return rows
+
+
+def stored_title(name):
+    try:
+        with open(os.path.join(TITLES, name)) as f:
+            return f.read().strip() or name
+    except OSError:
+        return name
+
+
+def main():
+    prevw, state, above, below, lasttitle = {}, {}, {}, {}, {}
+    rows = []
+    claudes = {}
+    tick = 0
+    last_sample = time.monotonic()
+
+    while True:
+        tick += 1
+        if not glob.glob(SOCK_GLOB):
+            rows, lasttitle = [], {}
+            time.sleep(2)
+            continue
+
+        busy_any = any(v == "busy" for v in state.values())
+        if not busy_any or tick % 4 == 1:
+            rows = kitty_tabs()
+            claudes = discover_claudes()
+
+        sums = sample_output(claudes)
+        now = time.monotonic()
+        elapsed = max(now - last_sample, 0.05)
+        last_sample = now
+
+        for sess in list(state):
+            if sess not in sums:
+                state.pop(sess, None)
+                prevw.pop(sess, None)
+                above.pop(sess, None)
+                below.pop(sess, None)
+
+        for sess, w in sums.items():
+            rate = (w - prevw.get(sess, w)) / elapsed
+            prevw[sess] = w
+            if rate > RATE:
+                above[sess] = above.get(sess, 0) + 1
+                below[sess] = 0
+                if rate > RATE * BURST or above[sess] >= 2:
+                    state[sess] = "busy"
+            else:
+                below[sess] = below.get(sess, 0) + 1
+                above[sess] = 0
+                if state.get(sess) == "busy" and below[sess] >= 4:
+                    state[sess] = "done"
+
+        busy_any = any(v == "busy" for v in state.values())
+
+        for sp, wid, on_screen, sess in rows:
+            st = state.get(sess, "none")
+            if st == "done" and on_screen:
+                state[sess] = st = "seen"
+            title = stored_title(sess)
+            if st == "busy":
+                t = f"{FRAMES[tick % 4]} {title}"
+            elif st == "done":
+                t = f"⦿ {title}"
+            else:
+                t = title
+            key = (sp, wid)
+            if lasttitle.get(key) != t:
+                try:
+                    rc(sp, "set-tab-title", {"title": t, "match": f"id:{wid}"}, False)
+                    lasttitle[key] = t
+                except OSError:
+                    pass
+
+        time.sleep(BUSY_SLEEP if busy_any else IDLE_SLEEP)
+
+
+if __name__ == "__main__":
+    if "--probe" in sys.argv:
+        print("kitty version:", VERSION)
+        print("claude output by session:", sample_output(discover_claudes()))
+        for row in kitty_tabs():
+            print("tab:", row)
+        sys.exit(0)
+    main()
