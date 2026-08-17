@@ -3,6 +3,9 @@
 # needed. With no name, picks the first free tN. Bound to alt+n in kitty.
 ZMX="$HOME/.local/bin/zmx"
 [[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
+# new sessions always start in $HOME - the launching window's cwd is
+# unreliable (a detached kitty sits in /, zmx clients hide the real cwd)
+cd "$HOME" 2>/dev/null
 name="$1"
 if [[ -z "$name" ]]; then
     existing=$($ZMX ls --short 2>/dev/null)

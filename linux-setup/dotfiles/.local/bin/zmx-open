@@ -1,23 +1,30 @@
 #!/bin/zsh
-# zmx-open: open every detached live zmx session as a tab in the current
-# kitty window. Bound to alt+o via remote_control_script.
-# Sessions already attached somewhere (clients>0) are skipped.
+# zmx-open: open every live zmx session as a tab in the current kitty window.
+# Bound to alt+o via remote_control_script. Sessions already open as a tab in
+# THIS kitty instance are skipped; ones attached in another window elsewhere
+# are opened anyway (multi-attach just mirrors, and you want your tabs here).
 ZMX="$HOME/.local/bin/zmx"
 [[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
 KITTEN=/usr/bin/kitten
 
+# session names already attached as tabs somewhere in this kitty instance
+here=$($KITTEN @ ls 2>/dev/null | jq -r '
+    .[].tabs[].windows[].foreground_processes[]?.cmdline
+    | select((.[0] // "" | endswith("zmx")) and ((.[1] // "") == "attach"))
+    | .[2] // empty')
+
 $ZMX ls 2>/dev/null | awk '
     !/ended=/ {
-        name=""; clients=""; created=""
+        name = ""; created = ""
         for (i = 1; i <= NF; i++) {
             split($i, kv, "=")
             if (kv[1] == "name")    name = kv[2]
-            if (kv[1] == "clients") clients = kv[2]
             if (kv[1] == "created") created = kv[2]
         }
-        if (clients == "0") print created, name
+        if (name != "") print created, name
     }' | sort -n |
     while read -r _ name; do
+        print -r -- "$here" | grep -qx -- "$name" && continue
         title=$(cat ~/.local/state/zmx/titles/"$name" 2>/dev/null)
         # attach via zmx-tab, which scrubs an inherited ZMX_SESSION
         $KITTEN @ launch --type=tab --tab-title "${title:-$name}" $HOME/.local/bin/zmx-tab "$name" >/dev/null
