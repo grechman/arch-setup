@@ -1,0 +1,10 @@
+[Unit]
+Description=kitty tab spinner for zmx sessions running claude
+
+[Service]
+ExecStart=%h/.local/bin/zmx-spin
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
