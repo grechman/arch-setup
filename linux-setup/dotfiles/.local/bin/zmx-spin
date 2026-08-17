@@ -6,22 +6,33 @@
 #
 # Why this exists: zmx parses and drops the inner shell's title/bell escapes,
 # so claude's native animated title can never reach the kitty tab bar from
-# inside a session. The only signal that crosses zmx is the output stream;
-# we detect "working" by the claude process's write-bytes delta in /proc.
+# inside a session. The only signal that crosses zmx is the output stream.
+#
+# Busy detection: sum of write-bytes (/proc/<pid>/io wchar) of every claude
+# process descended from the session's shell. Measured on this machine:
+# idle claude (cursor blink, agents UI) ~250 B/s, working claude (its own
+# spinner animation alone) >=1400 B/s. Threshold 150 B per 0.25s tick, with
+# 2-ticks-to-enter / 4-ticks-to-leave hysteresis so blink bursts don't spin.
 ZMX="$HOME/.local/bin/zmx"
 [[ -x "$ZMX" ]] || ZMX="$(command -v zmx)"
 KITTEN=/usr/bin/kitten
 TITLES=$HOME/.local/state/zmx/titles
+TICK=0.25
+THRESH=150
 
 frames=("✳" "✢" "✶" "✻")
-typeset -A prevw state lasttitle
+typeset -A prevw state above below lasttitle
 tick=0
+rows=""
 
 while true; do
     (( tick++ ))
 
-    # live sessions: "name shellpid" per line
-    sessions=$($ZMX ls 2>/dev/null | awk '
+    # session name -> shell pid
+    typeset -A shellof=()
+    while read -r n p; do
+        [[ -n "$n" ]] && shellof[$p]=$n
+    done <<< "$($ZMX ls 2>/dev/null | awk '
         !/ended=/ {
             n = ""; p = ""
             for (i = 1; i <= NF; i++) {
@@ -30,61 +41,78 @@ while true; do
                 if (kv[1] == "pid")  p = kv[2]
             }
             if (n != "" && p != "") print n, p
-        }')
+        }')"
 
-    while read -r name spid; do
-        [[ -z "$name" ]] && continue
-        cpid=$(pgrep -P "$spid" -x claude 2>/dev/null | head -n1)
-        if [[ -z "$cpid" ]]; then
-            # one level deeper (claude started from a subshell)
-            for kid in $(pgrep -P "$spid" 2>/dev/null); do
-                cpid=$(pgrep -P "$kid" -x claude 2>/dev/null | head -n1)
-                [[ -n "$cpid" ]] && break
-            done
-        fi
-        if [[ -n "$cpid" ]]; then
-            w=$(awk '/^wchar/{print $2}' /proc/$cpid/io 2>/dev/null)
-            d=$(( w - ${prevw[$name]:-$w} ))
-            prevw[$name]=$w
-            if (( d > 50 )); then
-                state[$name]=busy
-            elif [[ "${state[$name]}" == busy ]]; then
-                state[$name]=done
-            fi
-        else
-            state[$name]=none
-            unset "prevw[$name]"
-        fi
-    done <<< "$sessions"
-
-    for sock in /tmp/kitty-sock-*(N=); do
-        $KITTEN @ --to "unix:$sock" ls 2>/dev/null | jq -r '
-            .[] | .is_focused as $of | .tabs[] | .is_focused as $tf
-            | .windows[] | . as $w
-            | (($w.foreground_processes // [])[0].cmdline // []) as $c
-            | select(($c[0] // "" | endswith("zmx")) and (($c[1] // "") == "attach"))
-            | [$w.id, $of, $tf, ($c[2] // "")] | @tsv' |
-        while IFS=$'\t' read -r wid of tf name; do
-            [[ -z "$name" ]] && continue
-            s=${state[$name]:-none}
-            # marker is cleared only when the tab is genuinely on screen
-            if [[ "$s" == done && "$of" == true && "$tf" == true ]]; then
-                state[$name]=seen; s=seen
-            fi
-            title=$(cat "$TITLES/$name" 2>/dev/null)
-            title=${title:-$name}
-            case $s in
-                busy) t="${frames[$(( tick % 4 + 1 ))]} $title" ;;
-                done) t="⦿ $title" ;;
-                *)    t="$title" ;;
-            esac
-            key="$sock:$wid"
-            if [[ "${lasttitle[$key]}" != "$t" ]]; then
-                $KITTEN @ --to "unix:$sock" set-tab-title --match "id:$wid" "$t" 2>/dev/null
-                lasttitle[$key]=$t
+    # attribute every claude process to a session by walking its ancestors,
+    # so sub-claudes (agents dashboard children) count toward the same tab
+    typeset -A wsum=()
+    for cpid in $(pgrep -x claude 2>/dev/null); do
+        a=$cpid
+        for _ in 1 2 3 4 5; do
+            stat=$(</proc/$a/stat) 2>/dev/null || break
+            a=${${(z)${stat##*) }}[2]}   # ppid: 2nd field after the (comm)
+            [[ -z "$a" || "$a" == 1 ]] && break
+            if [[ -n "${shellof[$a]}" ]]; then
+                w=$(awk '/^wchar/{print $2}' /proc/$cpid/io 2>/dev/null)
+                (( wsum[${shellof[$a]}] += ${w:-0} ))
+                break
             fi
         done
     done
 
-    sleep 0.5
+    for name in ${(v)shellof}; do
+        w=${wsum[$name]:-}
+        if [[ -z "$w" ]]; then
+            state[$name]=none
+            unset "prevw[$name]"
+            continue
+        fi
+        d=$(( w - ${prevw[$name]:-$w} ))
+        prevw[$name]=$w
+        if (( d > THRESH )); then
+            (( above[$name]++ )); below[$name]=0
+            (( above[$name] >= 2 )) && state[$name]=busy
+        else
+            (( below[$name]++ )); above[$name]=0
+            if [[ "${state[$name]}" == busy ]] && (( below[$name] >= 4 )); then
+                state[$name]=done
+            fi
+        fi
+    done
+
+    # refresh the tab layout every other tick; title writes happen every tick
+    if [[ -z "$rows" ]] || (( tick % 2 == 0 )); then
+        rows=""
+        for sock in /tmp/kitty-sock-*(N=); do
+            rows+="$($KITTEN @ --to "unix:$sock" ls 2>/dev/null | jq -r --arg s "$sock" '
+                .[] | .is_focused as $of | .tabs[] | .is_focused as $tf
+                | .windows[] | . as $w
+                | (($w.foreground_processes // [])[0].cmdline // []) as $c
+                | select(($c[0] // "" | endswith("zmx")) and (($c[1] // "") == "attach"))
+                | [$s, $w.id, $of, $tf, ($c[2] // "")] | @tsv')"$'\n'
+        done
+    fi
+
+    while IFS=$'\t' read -r sock wid of tf name; do
+        [[ -z "$name" ]] && continue
+        s=${state[$name]:-none}
+        # marker is cleared only when the tab is genuinely on screen
+        if [[ "$s" == done && "$of" == true && "$tf" == true ]]; then
+            state[$name]=seen; s=seen
+        fi
+        title=$(cat "$TITLES/$name" 2>/dev/null)
+        title=${title:-$name}
+        case $s in
+            busy) t="${frames[$(( tick % 4 + 1 ))]} $title" ;;
+            done) t="⦿ $title" ;;
+            *)    t="$title" ;;
+        esac
+        key="$sock:$wid"
+        if [[ "${lasttitle[$key]}" != "$t" ]]; then
+            $KITTEN @ --to "unix:$sock" set-tab-title --match "id:$wid" "$t" 2>/dev/null
+            lasttitle[$key]=$t
+        fi
+    done <<< "$rows"
+
+    sleep $TICK
 done
