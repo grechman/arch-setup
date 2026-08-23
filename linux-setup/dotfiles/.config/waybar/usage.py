@@ -12,6 +12,8 @@ HOME = os.path.expanduser("~")
 CREDS = f"{HOME}/.claude/.credentials.json"
 COLORS = f"{HOME}/.config/waybar/colors.css"
 CACHE = f"{HOME}/.cache/waybar-usage.json"
+LOG = f"{HOME}/.cache/waybar-usage.log"
+STALE_AFTER = 600
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 TOKEN_URLS = [
     "https://platform.claude.com/v1/oauth/token",
@@ -192,7 +194,7 @@ def fetch_codex():
         )
         send({"method": "initialized"})
         send({"id": 2, "method": "account/rateLimits/read", "params": {}})
-        deadline = time.time() + 20
+        deadline = time.time() + 40
         while time.time() < deadline:
             line = p.stdout.readline()
             if not line:
@@ -202,6 +204,8 @@ def fetch_codex():
             except ValueError:
                 continue
             if o.get("id") == 2:
+                if "result" not in o:
+                    raise RuntimeError(f"codex app-server: {json.dumps(o.get('error'))[:300]}")
                 rl = o["result"]["rateLimits"]
                 wins = [w for w in (rl.get("primary"), rl.get("secondary")) if w]
                 weekly = max(wins, key=lambda w: w.get("windowDurationMins", 0))
@@ -247,7 +251,10 @@ def collect():
             for k, v in fetch().items():
                 fresh[k] = dict(v, ts=now)
         except Exception as e:
-            errors.append(f"{fetch.__name__[6:]}: {type(e).__name__}: {e}")
+            msg = f"{fetch.__name__[6:]}: {type(e).__name__}: {e}"
+            errors.append(msg)
+            with open(LOG, "a") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
     cache.update(fresh)
     save_cache(cache)
     return cache, fresh, errors
@@ -278,7 +285,7 @@ def render(cache, fresh, errors):
             continue
         p = max(0, min(100, int(v["pct"])))
         pcts.append(p)
-        is_stale = key not in fresh
+        is_stale = time.time() - v.get("ts", 0) > STALE_AFTER
         w, size, alpha = presence(p)
         if is_stale:
             stale = True

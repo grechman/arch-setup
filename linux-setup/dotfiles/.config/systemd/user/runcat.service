@@ -1,0 +1,11 @@
+[Unit]
+Description=RunCat frame daemon for waybar
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/uv run --script %h/.config/waybar/runcat.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

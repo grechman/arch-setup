@@ -2,8 +2,8 @@
     "position": "top",
     "height": 35,
     "modules-left": ["ext/workspaces", "custom/usage"],
-    "modules-center": ["clock"],
-    "modules-right": ["hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
+    "modules-center": ["group/island"],
+    "modules-right": ["image#cat", "image#ram", "hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
 
     "ext/workspaces": {
         "format": "{icon}",
@@ -63,6 +63,44 @@
     "custom/notif": {
         "format": "󰂜",
         "on-click": "swaync-client -t -sw"
+    },
+
+    "group/island": {
+        "orientation": "horizontal",
+        "modules": ["custom/island-ev", "custom/island-clock"]
+    },
+
+    "custom/island-ev": {
+        "exec": "uv run --script ~/.config/waybar/island.py",
+        "return-type": "json",
+        "format": "{}",
+        "tooltip": false
+    },
+
+    "custom/island-clock": {
+        "exec": "cat ~/.cache/island/clock.json",
+        "return-type": "json",
+        "interval": 3600,
+        "signal": 10,
+        "format": "{}",
+        "on-click": "uv run --script ~/.config/waybar/island.py menu",
+        "on-click-right": "mkdir -p ~/.cache/island && touch ~/.cache/island/showdate",
+        "tooltip": true
+    },
+
+    "image#cat": {
+        "exec": "cat ~/.cache/runcat/cat.txt",
+        "interval": 1,
+        "signal": 8,
+        "size": 28,
+        "tooltip": true
+    },
+
+    "image#ram": {
+        "exec": "uv run --script ~/.config/waybar/elephant.py",
+        "interval": 5,
+        "size": 28,
+        "tooltip": true
     },
 
     "custom/usage": {
