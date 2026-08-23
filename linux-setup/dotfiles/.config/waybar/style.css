@@ -33,6 +33,14 @@
   color: @accent;
 }
 
+#custom-usage {
+  min-height: 35px;
+  padding: 0 6.3px;
+  margin-left: -6px;
+  color: @fg_alt;
+  background: transparent;
+}
+
 #clock {
   min-height: 35px;
   padding: 0 12.6px;

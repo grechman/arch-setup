@@ -1,7 +1,7 @@
 {
     "position": "top",
     "height": 35,
-    "modules-left": ["ext/workspaces"],
+    "modules-left": ["ext/workspaces", "custom/usage"],
     "modules-center": ["clock"],
     "modules-right": ["hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
 
@@ -63,5 +63,13 @@
     "custom/notif": {
         "format": "󰂜",
         "on-click": "swaync-client -t -sw"
+    },
+
+    "custom/usage": {
+        "exec": "uv run --script ~/.config/waybar/usage.py",
+        "return-type": "json",
+        "interval": 120,
+        "format": "{}",
+        "tooltip": true
     }
 }
