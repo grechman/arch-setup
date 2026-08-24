@@ -3,7 +3,7 @@
     "height": 35,
     "modules-left": ["ext/workspaces", "custom/usage"],
     "modules-center": ["group/island"],
-    "modules-right": ["image#cat", "image#ram", "hyprland/language", "pulseaudio", "network", "battery", "custom/notif"],
+    "modules-right": ["image#cat", "image#ram", "pulseaudio", "network", "custom/timer", "battery", "hyprland/language"],
 
     "ext/workspaces": {
         "format": "{icon}",
@@ -57,17 +57,22 @@
     },
 
     "hyprland/language": {
-        "format": "{short}"
+        "format": "{short}",
+        "keyboard-name": "at-translated-set-2-keyboard"
     },
 
-    "custom/notif": {
-        "format": "󰂜",
-        "on-click": "swaync-client -t -sw"
+    "custom/timer": {
+        "exec": "uv run --script ~/.config/waybar/timer.py",
+        "return-type": "json",
+        "interval": 1,
+        "format": "{}",
+        "on-click": "uv run --script ~/.config/waybar/timer.py menu",
+        "tooltip": true
     },
 
     "group/island": {
         "orientation": "horizontal",
-        "modules": ["custom/island-ev", "custom/island-clock"]
+        "modules": ["custom/island-ev", "custom/island-clock", "custom/island-dot"]
     },
 
     "custom/island-ev": {
@@ -86,6 +91,15 @@
         "on-click": "uv run --script ~/.config/waybar/island.py menu",
         "on-click-right": "mkdir -p ~/.cache/island && touch ~/.cache/island/showdate",
         "tooltip": true
+    },
+
+    "custom/island-dot": {
+        "exec": "cat ~/.cache/island/dot.json",
+        "return-type": "json",
+        "interval": 3600,
+        "signal": 10,
+        "format": "{}",
+        "tooltip": false
     },
 
     "image#cat": {

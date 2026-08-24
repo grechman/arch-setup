@@ -1,5 +1,5 @@
 {
-    "position": "top",
+    "position": "bottom",
     "height": 35,
     "modules-left": ["ext/workspaces", "custom/usage"],
     "modules-center": ["group/island"],
@@ -76,25 +76,25 @@
     },
 
     "custom/island-ev": {
-        "exec": "uv run --script ~/.config/waybar/island.py",
+        "exec": "env ISLAND_DIR=/home/grechman/.cache/island-dev uv run --script ~/.config/waybar/island.py",
         "return-type": "json",
         "format": "{}",
         "tooltip": false
     },
 
     "custom/island-clock": {
-        "exec": "cat ~/.cache/island/clock.json",
+        "exec": "cat /home/grechman/.cache/island-dev/clock.json",
         "return-type": "json",
         "interval": 3600,
         "signal": 10,
         "format": "{}",
-        "on-click": "uv run --script ~/.config/waybar/island.py menu",
-        "on-click-right": "mkdir -p ~/.cache/island && touch ~/.cache/island/showdate",
+        "on-click": "env ISLAND_DIR=/home/grechman/.cache/island-dev uv run --script ~/.config/waybar/island.py menu",
+        "on-click-right": "mkdir -p ~/.cache/island-dev && touch ~/.cache/island-dev/showdate",
         "tooltip": true
     },
 
     "custom/island-dot": {
-        "exec": "cat ~/.cache/island/dot.json",
+        "exec": "cat /home/grechman/.cache/island-dev/dot.json",
         "return-type": "json",
         "interval": 3600,
         "signal": 10,

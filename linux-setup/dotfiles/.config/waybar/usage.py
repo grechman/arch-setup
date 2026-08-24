@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import re
@@ -13,7 +14,10 @@ CREDS = f"{HOME}/.claude/.credentials.json"
 COLORS = f"{HOME}/.config/waybar/colors.css"
 CACHE = f"{HOME}/.cache/waybar-usage.json"
 LOG = f"{HOME}/.cache/waybar-usage.log"
-STALE_AFTER = 600
+STALE_AFTER = 1800
+EVENTS_DIR = f"{HOME}/.cache/island/events"
+RESET_NAMES = {"gpt": "gpt reset", "5h": "5h reset", "all": "weekly reset", "fable": "fable reset"}
+RESET_ICONS = {"gpt": "\uec1e", "5h": "\uf51b", "all": "\uf51b", "fable": "\uf51b"}
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 TOKEN_URLS = [
     "https://platform.claude.com/v1/oauth/token",
@@ -194,7 +198,7 @@ def fetch_codex():
         )
         send({"method": "initialized"})
         send({"id": 2, "method": "account/rateLimits/read", "params": {}})
-        deadline = time.time() + 40
+        deadline = time.time() + 15
         while time.time() < deadline:
             line = p.stdout.readline()
             if not line:
@@ -226,6 +230,86 @@ def fetch_codex():
         p.kill()
 
 
+def codex_http():
+    auth = json.load(open(f"{HOME}/.codex/auth.json"))
+    tok = auth["tokens"]["access_token"]
+    acc = auth["tokens"].get("account_id") or ""
+    d = None
+    last = None
+    for url in ("https://chatgpt.com/backend-api/codex/usage", "https://chatgpt.com/backend-api/wham/usage"):
+        try:
+            d = http_json(url, headers={"Authorization": f"Bearer {tok}", "chatgpt-account-id": acc, "User-Agent": "codex-cli", "Accept": "application/json"})
+            break
+        except (urllib.error.URLError, urllib.error.HTTPError, ValueError) as e:
+            last = e
+    if d is None:
+        raise last
+    rl = d.get("rate_limit") or {}
+    wins = [w for w in (rl.get("primary_window"), rl.get("secondary_window")) if w]
+    weekly = max(wins, key=lambda w: w.get("limit_window_seconds", 0))
+    out = {"pct": round(float(weekly["used_percent"])), "reset": weekly.get("reset_at")}
+    credits = d.get("rate_limit_reset_credits") or {}
+    if "available_count" in credits:
+        out["resets_available"] = int(credits.get("available_count") or 0)
+    return {"gpt": out}
+
+
+def codex_sessions_fallback():
+    root = f"{HOME}/.codex/sessions"
+    files = sorted(glob.glob(f"{root}/*/*/*/*.jsonl"), key=os.path.getmtime, reverse=True)[:3]
+    for path in files:
+        last = None
+        with open(path, errors="ignore") as f:
+            for line in f:
+                if '"rate_limits"' in line:
+                    last = line
+        if not last:
+            continue
+        try:
+            obj = json.loads(last)
+        except ValueError:
+            continue
+        rl = None
+        stack = [obj]
+        while stack:
+            cur = stack.pop()
+            if isinstance(cur, dict):
+                if "rate_limits" in cur:
+                    rl = cur["rate_limits"]
+                    break
+                stack.extend(cur.values())
+            elif isinstance(cur, list):
+                stack.extend(cur)
+        if not rl:
+            continue
+        wins = [w for w in (rl.get("primary"), rl.get("secondary")) if w]
+        if not wins:
+            continue
+        weekly = max(wins, key=lambda w: w.get("window_minutes", 0))
+        return {
+            "gpt": {
+                "pct": round(float(weekly["used_percent"])),
+                "reset": weekly.get("resets_at"),
+                "ts": os.path.getmtime(path),
+            }
+        }
+    raise RuntimeError("no session fallback")
+
+
+def fetch_codex_any():
+    try:
+        return codex_http()
+    except Exception as e:
+        with open(LOG, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} codex(http): {type(e).__name__}: {e}; trying app-server\n")
+    try:
+        return fetch_codex()
+    except Exception as e:
+        with open(LOG, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} codex(app-server): {type(e).__name__}: {e}; using session fallback\n")
+        return codex_sessions_fallback()
+
+
 def load_cache():
     try:
         return json.load(open(CACHE))
@@ -246,10 +330,18 @@ def collect():
     now = time.time()
     fresh = {}
     errors = []
-    for fetch in (fetch_codex, fetch_claude):
+    resets = []
+    for fetch in (fetch_codex_any, fetch_claude):
         try:
             for k, v in fetch().items():
-                fresh[k] = dict(v, ts=now)
+                old = cache.get(k) or {}
+                ts = v.get("ts", now)
+                if old and ts < old.get("ts", 0):
+                    continue
+                merged = dict(old)
+                merged.update(v)
+                merged["ts"] = ts
+                fresh[k] = merged
         except Exception as e:
             msg = f"{fetch.__name__[6:]}: {type(e).__name__}: {e}"
             errors.append(msg)
@@ -257,7 +349,29 @@ def collect():
                 f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
     cache.update(fresh)
     save_cache(cache)
+    post_resets(resets)
     return cache, fresh, errors
+
+
+def post_resets(resets):
+    if not resets:
+        return
+    events = []
+    claude = {k for k in resets if k in ("5h", "all", "fable")}
+    if {"all", "fable"} <= claude:
+        events.append(("reset-weekly", "\uf51b", "claude weekly reset"))
+        if "5h" in claude:
+            pass
+    else:
+        for k in claude:
+            events.append((f"reset-{k}", "\uf51b", RESET_NAMES[k]))
+    if "gpt" in resets:
+        events.append(("reset-gpt", "\uec1e", RESET_NAMES["gpt"]))
+    os.makedirs(EVENTS_DIR, exist_ok=True)
+    for eid, icon, text in events:
+        ev = {"id": eid, "icon": icon, "text": text, "severity": "good", "ttl": 5}
+        with open(f"{EVENTS_DIR}/{eid}.json", "w") as f:
+            json.dump(ev, f)
 
 
 def span(text, color, weight=400, size=None, alpha=None):
@@ -289,7 +403,11 @@ def render(cache, fresh, errors):
         w, size, alpha = presence(p)
         if is_stale:
             stale = True
-            cells.append(sigil + span(f"{p:>2d}", c["muted"], w, size, 60))
+            cell = sigil + span(f"{p:>2d}", c["muted"], w, size, 60)
+            if v.get("resets_available", 0):
+                glyph, gsize = RESET_GLYPH[state(p)]
+                cell += " " + span(glyph, c["muted"], size=gsize, alpha=60)
+            cells.append(cell)
             age = int((time.time() - v.get("ts", 0)) / 60)
             tip.append(
                 f"{name:<14}{p:>4}%  stale {age} min  resets {fmt_reset(v.get('reset'))}"

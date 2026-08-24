@@ -52,9 +52,12 @@ hl.config({
 
         blur = {
             enabled = true,
-            size = 8,
-            ignore_opacity = false,
-            passes = 3,
+            size = 6,
+            -- t3code is natively opaque: without this its compositor-set alpha
+            -- would show the wallpaper through unblurred. kitty and ghostty opt
+            -- out per-window below.
+            ignore_opacity = true,
+            passes = 2,
             noise = 0.01,
             vibrancy = 0.1696,
             popups = true,
@@ -110,6 +113,9 @@ bind_exec(main_mod .. " + SHIFT + S", "hyprshot -m window --clipboard-only")
 
 -- Session utilities
 bind_exec(main_mod .. " + W", "pkill waybar && waybar &")
+bind_exec(main_mod .. " + T", os.getenv("HOME") .. "/.config/waybar/overlay.sh show")
+bind(main_mod .. " + T", exec(os.getenv("HOME") .. "/.config/waybar/overlay.sh hide"), { release = true })
+bind_exec(main_mod .. " + SHIFT + T", os.getenv("HOME") .. "/.config/waybar/overlay.sh toggle")
 bind_exec(main_mod .. " + SHIFT + L", "hyprlock")
 bind_exec(main_mod .. " + R", [[name=$(basename "$(readlink "$HOME/.config/themes/active" 2>/dev/null || printf kanagawa-dragon)"); "$HOME/.local/bin/theme-apply" "$name" && hyprctl reload]])
 
@@ -118,7 +124,7 @@ bind(main_mod .. " + SHIFT + M", hl.dsp.workspace.move({ monitor = "+1" }))
 bind(main_mod .. " + M", hl.dsp.workspace.move({ monitor = "+1" }))
 
 -- Apps and window control
-bind_exec(main_mod .. " + Q", terminal)
+bind_exec(main_mod .. " + q", os.getenv("HOME") .. "/.local/bin/t3code")
 bind_exec(main_mod .. " + Return", "kitty")
 bind(main_mod .. " + C", hl.dsp.window.close())
 bind(main_mod .. " + SHIFT + E", hl.dsp.exit())
@@ -211,3 +217,9 @@ for _, selector in ipairs({ "w[tv1]", "f[1]" }) do
         rounding = 0,
     })
 end
+
+hl.window_rule({
+    name = "t3code-opacity",
+    match = { class = "^(t3code)$" },
+    opacity = themes.window_opacity(),
+})

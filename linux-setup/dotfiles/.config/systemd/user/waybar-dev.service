@@ -1,0 +1,10 @@
+[Unit]
+Description=Bottom development waybar
+
+[Service]
+ExecStart=/usr/bin/waybar -c %h/.config/waybar/dev/config.jsonc -s %h/.config/waybar/dev/style.css
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

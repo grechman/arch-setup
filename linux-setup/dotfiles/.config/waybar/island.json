@@ -1,0 +1,10 @@
+{
+  "sound": true,
+  "seconds": 4.0,
+  "producers": {
+    "charging": true,
+    "low": true,
+    "critical": true,
+    "external": true
+  }
+}
